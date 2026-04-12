@@ -1,0 +1,31 @@
+[project]
+name = "arxiv-upvote-trends"
+version = "0.1.0"
+description = "Collect trending papers from Hugging Face and alphaXiv."
+readme = "README.md"
+license = "MIT"
+requires-python = "~=3.14.4"
+dependencies = [
+    "datasets>=4.8.4",
+    "google-cloud-storage>=3.10.1",
+    "huggingface-hub>=1.10.1",
+    "joblib>=1.5.3",
+    "pandas>=3.0.2",
+    "python-dotenv>=1.2.2",
+    "requests>=2.33.1",
+]
+
+[dependency-groups]
+dev = [
+    "jupyterlab>=4.5.6",
+    "pre-commit>=4.5.1",
+    "pytest>=9.0.2",
+    "ruff>=0.15.8",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 119
