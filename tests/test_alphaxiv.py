@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from arxiv_upvote_trends import search_alphaxiv
-from arxiv_upvote_trends.alphaxiv import _get_alphaxiv
+from arxiv_upvote_trends.alphaxiv import _get_alphaxiv, extract_alphaxiv_stats
 
 
 @patch("arxiv_upvote_trends.alphaxiv.time.sleep")
@@ -57,6 +57,30 @@ def test_search_alphaxiv_single_page(mock_get, tmp_path):
     result = search_alphaxiv.__wrapped__(max_papers=5, wait=0)
     assert result == [{"id": "1"}, {"id": "2"}]
     mock_get.assert_called_once_with(page_num=0, interval="30+Days", wait=0)
+
+
+def test_extract_alphaxiv_stats():
+    paper = {
+        "universal_paper_id": "2604.12345",
+        "metrics": {"public_total_votes": 42},
+    }
+    result = extract_alphaxiv_stats(paper)
+    assert result == {
+        "url": "https://www.alphaxiv.org/abs/2604.12345",
+        "arxiv_id": ["2604.12345"],
+        "score": 42,
+        "num_comments": 0,
+    }
+
+
+def test_extract_alphaxiv_stats_missing_fields():
+    result = extract_alphaxiv_stats({})
+    assert result == {
+        "url": "https://www.alphaxiv.org/abs/",
+        "arxiv_id": [""],
+        "score": 0,
+        "num_comments": 0,
+    }
 
 
 @patch("arxiv_upvote_trends.alphaxiv._get_alphaxiv")

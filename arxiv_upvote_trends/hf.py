@@ -67,3 +67,14 @@ def search_huggingface(max_papers: int = 300, days: int = 30, wait: float = 1.0)
         if len(all_papers) >= max_papers:
             break
     return all_papers[:max_papers]
+
+
+def extract_huggingface_stats(paper: dict) -> dict:
+    """Hugging Face の検索結果から統計情報を抽出する。"""
+    arxiv_id = str(paper.get("id") or "")
+    return {
+        "url": f"https://huggingface.co/papers/{arxiv_id}",
+        "arxiv_id": [arxiv_id],
+        "score": int(paper.get("upvotes") or 0),
+        "num_comments": int(paper.get("comments") or 0),
+    }

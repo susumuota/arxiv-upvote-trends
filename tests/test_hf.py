@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
-from arxiv_upvote_trends.hf import _get_huggingface
+from arxiv_upvote_trends.hf import _get_huggingface, extract_huggingface_stats
 
 
 @dataclass
@@ -42,3 +42,28 @@ def test_respects_wait_parameter(mock_sleep):
     api.list_daily_papers.return_value = []
     _get_huggingface(api, "2026-04-01", wait=2.5)
     mock_sleep.assert_called_once_with(2.5)
+
+
+def test_extract_huggingface_stats():
+    paper = {
+        "id": "2604.12345",
+        "upvotes": 10,
+        "comments": 3,
+    }
+    result = extract_huggingface_stats(paper)
+    assert result == {
+        "url": "https://huggingface.co/papers/2604.12345",
+        "arxiv_id": ["2604.12345"],
+        "score": 10,
+        "num_comments": 3,
+    }
+
+
+def test_extract_huggingface_stats_missing_fields():
+    result = extract_huggingface_stats({})
+    assert result == {
+        "url": "https://huggingface.co/papers/",
+        "arxiv_id": [""],
+        "score": 0,
+        "num_comments": 0,
+    }

@@ -74,3 +74,14 @@ def search_alphaxiv(
     total_pages = math.ceil(max_papers / _PAGE_SIZE)
     pages = [_get_alphaxiv(page_num=page_num, interval=interval, wait=wait) for page_num in range(total_pages)]
     return list(chain.from_iterable(pages))[:max_papers]
+
+
+def extract_alphaxiv_stats(paper: dict) -> dict:
+    """alphaXiv の検索結果から統計情報を抽出する。"""
+    arxiv_id = str(paper.get("universal_paper_id") or "")
+    return {
+        "url": f"https://www.alphaxiv.org/abs/{arxiv_id}",
+        "arxiv_id": [arxiv_id],
+        "score": int((paper.get("metrics") or {}).get("public_total_votes") or 0),
+        "num_comments": 0,
+    }

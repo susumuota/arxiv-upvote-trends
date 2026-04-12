@@ -7,7 +7,15 @@ import os
 import pandas as pd
 from dotenv import load_dotenv
 
-from arxiv_upvote_trends import restore_dir, save_dir, search_alphaxiv, search_huggingface, upload_papers
+from arxiv_upvote_trends import (
+    extract_alphaxiv_stats,
+    extract_huggingface_stats,
+    restore_dir,
+    save_dir,
+    search_alphaxiv,
+    search_huggingface,
+    upload_papers,
+)
 
 load_dotenv()
 
@@ -20,28 +28,6 @@ logger = logging.getLogger(__name__)
 
 HF_REPO_ID = os.environ.get("HF_REPO_ID", "")
 GCS_BUCKET = os.environ.get("GCS_BUCKET", "")
-
-
-def extract_alphaxiv_stats(paper: dict) -> dict:
-    """alphaXiv の検索結果から統計情報を抽出する。"""
-    arxiv_id = str(paper.get("universal_paper_id") or "")
-    return {
-        "url": f"https://www.alphaxiv.org/abs/{arxiv_id}",
-        "arxiv_id": [arxiv_id],
-        "score": int((paper.get("metrics") or {}).get("public_total_votes") or 0),
-        "num_comments": 0,
-    }
-
-
-def extract_huggingface_stats(paper: dict) -> dict:
-    """Hugging Face の検索結果から統計情報を抽出する。"""
-    arxiv_id = str(paper.get("id") or "")
-    return {
-        "url": f"https://huggingface.co/papers/{arxiv_id}",
-        "arxiv_id": [arxiv_id],
-        "score": int(paper.get("upvotes") or 0),
-        "num_comments": int(paper.get("comments") or 0),
-    }
 
 
 def aggregate_stats(ax_stats: list[dict], hf_stats: list[dict]) -> pd.DataFrame:
