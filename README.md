@@ -8,7 +8,7 @@
 
 Collect trending papers from [alphaXiv](https://www.alphaxiv.org/) and [Hugging Face Daily Papers](https://huggingface.co/papers).
 
-<!-- TODO: Add project purpose and background -->
+Fetches upvote counts and comment stats from both sources, aggregates them by arXiv ID, and uploads the results to a Hugging Face Dataset. Runs daily on Google Cloud Run Jobs with API response caching via GCS for resilience.
 
 ## Requirements
 
