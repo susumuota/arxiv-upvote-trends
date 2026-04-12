@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from arxiv_upvote_trends.alphaxiv import _get_alphaxiv
 from arxiv_upvote_trends import search_alphaxiv
+from arxiv_upvote_trends.alphaxiv import _get_alphaxiv
 
 
 @patch("arxiv_upvote_trends.alphaxiv.time.sleep")

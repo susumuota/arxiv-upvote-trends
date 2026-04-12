@@ -3,8 +3,8 @@
 
 from .alphaxiv import search_alphaxiv
 from .cache import fallback_cache
-from .gcs import restore_dir, save_dir
 from .dataset import download_papers, upload_papers
+from .gcs import restore_dir, save_dir
 from .hf import search_huggingface
 
 __all__ = [
