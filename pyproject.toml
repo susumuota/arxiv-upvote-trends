@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Collect trending papers from Hugging Face and alphaXiv."
 readme = "README.md"
 license = "MIT"
-requires-python = "~=3.14.4"
+requires-python = ">=3.14"
 dependencies = [
     "datasets>=4.8.4",
     "google-cloud-storage>=3.10.1",
