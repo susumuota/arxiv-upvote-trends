@@ -6,8 +6,10 @@ from .cache import fallback_cache
 from .dataset import download_papers, upload_papers
 from .gcs import restore_dir, save_dir
 from .hf import extract_huggingface_stats, search_huggingface
+from .pdf import capture_arxiv_first_page
 
 __all__ = [
+    "capture_arxiv_first_page",
     "download_papers",
     "extract_alphaxiv_stats",
     "extract_huggingface_stats",

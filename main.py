@@ -8,6 +8,7 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from arxiv_upvote_trends import (
+    capture_arxiv_first_page,
     extract_alphaxiv_stats,
     extract_huggingface_stats,
     restore_dir,
@@ -67,6 +68,12 @@ def main():
     df_stats = aggregate_stats(ax_stats, hf_stats)
 
     logger.info(f"stats:\n{df_stats.head(50)}")
+
+    for i, arxiv_id in enumerate(df_stats["arxiv_id"].head(3), start=1):
+        try:
+            capture_arxiv_first_page(arxiv_id, f"top{i}.png")
+        except Exception:
+            logger.exception(f"Failed to capture first page for {arxiv_id}")
 
     if GCS_BUCKET:
         save_dir(GCS_BUCKET, "fallback_cache.tar.gz", "./fallback_cache")
