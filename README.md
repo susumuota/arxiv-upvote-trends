@@ -1,6 +1,10 @@
 # arxiv-upvote-trends
 
 [![CI](https://github.com/susumuota/arxiv-upvote-trends/actions/workflows/ci.yaml/badge.svg)](https://github.com/susumuota/arxiv-upvote-trends/actions/workflows/ci.yaml)
+[![Python](https://img.shields.io/badge/python-3.14-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 Collect trending papers from [alphaXiv](https://www.alphaxiv.org/) and [Hugging Face Daily Papers](https://huggingface.co/papers).
 
