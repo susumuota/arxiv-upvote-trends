@@ -276,6 +276,8 @@ gcloud logging read "resource.type=cloud_scheduler_job" \
 
 ## Development
 
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/).
+
 ```bash
 # Test
 pytest

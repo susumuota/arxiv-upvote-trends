@@ -56,3 +56,13 @@ uv add <package>
 - Use Ruff (line-length=119)
 - Proper noun casing: `alphaXiv`, `Hugging Face` (function and module names are lowercase)
 - When calling functions, pass positional arguments without keywords and keyword arguments (those with defaults) with keywords
+
+## Commit Messages
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/). Examples:
+
+- `feat: add pagination to alphaXiv client`
+- `fix: handle timeout in fallback_cache`
+- `ci: add GitHub Actions workflow`
+- `docs: update README setup steps`
+- `chore: update dependencies`
