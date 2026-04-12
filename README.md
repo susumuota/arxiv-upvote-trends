@@ -1,5 +1,7 @@
 # arxiv-upvote-trends
 
+[![CI](https://github.com/susumuota/arxiv-upvote-trends/actions/workflows/ci.yaml/badge.svg)](https://github.com/susumuota/arxiv-upvote-trends/actions/workflows/ci.yaml)
+
 Collect trending papers from [alphaXiv](https://www.alphaxiv.org/) and [Hugging Face Daily Papers](https://huggingface.co/papers).
 
 <!-- TODO: Add project purpose and background -->
