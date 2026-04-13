@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents when working with code in this repository.
 
 ## Project Overview
 
@@ -59,10 +59,14 @@ uv add <package>
 
 ## Commit Messages
 
-Follow [Conventional Commits](https://www.conventionalcommits.org/). Examples:
+Follow [Conventional Commits](https://www.conventionalcommits.org/). Keep the commit message on a single line. Examples:
 
 - `feat: add pagination to alphaXiv client`
 - `fix: handle timeout in fallback_cache`
 - `ci: add GitHub Actions workflow`
 - `docs: update README setup steps`
 - `chore: update dependencies`
+
+## Push
+
+Use `git push origin main`.
