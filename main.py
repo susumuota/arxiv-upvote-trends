@@ -4,10 +4,10 @@
 import logging
 import os
 
-import pandas as pd
 from dotenv import load_dotenv
 
 from arxiv_upvote_trends import (
+    aggregate_stats,
     capture_arxiv_first_page,
     extract_alphaxiv_stats,
     extract_huggingface_stats,
@@ -29,23 +29,6 @@ logger = logging.getLogger(__name__)
 
 HF_REPO_ID = os.environ.get("HF_REPO_ID", "")
 GCS_BUCKET = os.environ.get("GCS_BUCKET", "")
-
-
-def aggregate_stats(paper_stats: list[dict]) -> pd.DataFrame:
-    """alphaXiv と Hugging Face のスコアを arXiv ID で集約する。"""
-    df_docs = pd.DataFrame(paper_stats)
-    return (
-        df_docs.explode("arxiv_id")
-        .groupby("arxiv_id")
-        .agg(
-            score=("score", "sum"),
-            num_comments=("num_comments", "sum"),
-            count=("url", "count"),
-            url=("url", pd.Series.to_list),
-        )
-        .sort_values(by=["score", "num_comments", "count"], ascending=False)
-        .reset_index()
-    )
 
 
 def main():

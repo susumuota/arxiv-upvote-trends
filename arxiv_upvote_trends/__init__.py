@@ -7,8 +7,10 @@ from .dataset import download_papers, upload_papers
 from .gcs import restore_dir, save_dir
 from .hf import extract_huggingface_stats, search_huggingface
 from .pdf import capture_arxiv_first_page
+from .stats import aggregate_stats
 
 __all__ = [
+    "aggregate_stats",
     "capture_arxiv_first_page",
     "download_papers",
     "extract_alphaxiv_stats",
