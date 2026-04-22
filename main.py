@@ -31,9 +31,9 @@ HF_REPO_ID = os.environ.get("HF_REPO_ID", "")
 GCS_BUCKET = os.environ.get("GCS_BUCKET", "")
 
 
-def aggregate_stats(ax_stats: list[dict], hf_stats: list[dict]) -> pd.DataFrame:
+def aggregate_stats(paper_stats: list[dict]) -> pd.DataFrame:
     """alphaXiv と Hugging Face のスコアを arXiv ID で集約する。"""
-    df_docs = pd.DataFrame(ax_stats + hf_stats)
+    df_docs = pd.DataFrame(paper_stats)
     return (
         df_docs.explode("arxiv_id")
         .groupby("arxiv_id")
@@ -65,7 +65,7 @@ def main():
     ax_stats = [extract_alphaxiv_stats(p) for p in ax_papers]
     hf_stats = [extract_huggingface_stats(p) for p in hf_papers]
 
-    df_stats = aggregate_stats(ax_stats, hf_stats)
+    df_stats = aggregate_stats(ax_stats + hf_stats)
 
     logger.info(f"stats:\n{df_stats.head(50)}")
 
