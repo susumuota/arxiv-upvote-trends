@@ -26,7 +26,7 @@ def restore_dir(bucket_name: str, blob_name: str, local_dir: str) -> None:
     blob = bucket.blob(blob_name)
 
     if not blob.exists():
-        logger.info(f"No archive found at gs://{bucket_name}/{blob_name}. Skipping download.")
+        logger.info("No archive found at gs://%s/%s. Skipping download.", bucket_name, blob_name)
         return
 
     buf = io.BytesIO()
@@ -36,7 +36,7 @@ def restore_dir(bucket_name: str, blob_name: str, local_dir: str) -> None:
     with tarfile.open(fileobj=buf, mode="r:gz") as tar:
         tar.extractall(path=local_dir, filter="data")
 
-    logger.info(f"Restored gs://{bucket_name}/{blob_name} to {local_dir}")
+    logger.info("Restored gs://%s/%s to %s", bucket_name, blob_name, local_dir)
 
 
 def save_dir(bucket_name: str, blob_name: str, local_dir: str) -> None:
@@ -51,7 +51,7 @@ def save_dir(bucket_name: str, blob_name: str, local_dir: str) -> None:
     """
     local_path = Path(local_dir)
     if not local_path.exists():
-        logger.info(f"Directory {local_dir} does not exist. Skipping upload.")
+        logger.info("Directory %s does not exist. Skipping upload.", local_dir)
         return
 
     buf = io.BytesIO()
@@ -65,4 +65,4 @@ def save_dir(bucket_name: str, blob_name: str, local_dir: str) -> None:
     blob = bucket.blob(blob_name)
     blob.upload_from_file(buf)
 
-    logger.info(f"Uploaded {local_dir} to gs://{bucket_name}/{blob_name}")
+    logger.info("Uploaded %s to gs://%s/%s", local_dir, bucket_name, blob_name)

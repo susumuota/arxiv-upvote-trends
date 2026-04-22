@@ -32,5 +32,5 @@ def capture_arxiv_first_page(arxiv_id: str, output_path: str, dpi: int = 200, ti
     resp.raise_for_status()
     images = convert_from_bytes(resp.content, dpi=dpi, first_page=1, last_page=1)
     images[0].save(output_path, "PNG")
-    logger.info(f"Saved first page of {arxiv_id} to {output_path}")
+    logger.info("Saved first page of %s to %s", arxiv_id, output_path)
     return output_path

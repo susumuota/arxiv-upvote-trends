@@ -36,7 +36,7 @@ def upload_papers(papers: list[dict], repo_id: str, filename: str) -> str:
         )
 
     url = f"https://huggingface.co/datasets/{repo_id}"
-    logger.info(f"Uploaded {len(papers)} papers to {url}")
+    logger.info("Uploaded %s papers to %s", len(papers), url)
     return url
 
 

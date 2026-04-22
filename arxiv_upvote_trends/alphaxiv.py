@@ -42,14 +42,14 @@ def _get_alphaxiv(
     referer = f"https://www.alphaxiv.org/?interval={interval}&sort={_SORT_BY}"
     time.sleep(wait)
     response = requests.get(url, headers={"Referer": referer, "User-Agent": _USER_AGENT})
-    logger.info(f"Fetched page {page_num} with status code {response.status_code}")
+    logger.info("Fetched page %s with status code %s", page_num, response.status_code)
     if response.status_code != 200:
         raise Exception(f"Failed to fetch data: {response.status_code}")
     js = response.json()
     if not js or "error" in js or "papers" not in js:
         raise Exception(f"No papers found or error in response: {js}")
     papers = js["papers"]
-    logger.info(f"Fetched {len(papers)} papers from page {page_num}")
+    logger.info("Fetched %s papers from page %s", len(papers), page_num)
     return papers
 
 

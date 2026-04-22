@@ -57,6 +57,10 @@ uv add <package>
 - Proper noun casing: `alphaXiv`, `Hugging Face` (function and module names are lowercase)
 - When calling functions, pass positional arguments without keywords and keyword arguments (those with defaults) with keywords
 
+## Before Commit
+
+Run `uv run pre-commit run --all-files` before creating a commit.
+
 ## Commit Messages
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/). Keep the commit message on a single line. Examples:

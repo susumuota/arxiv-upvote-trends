@@ -36,12 +36,12 @@ def main():
         restore_dir(GCS_BUCKET, "fallback_cache.tar.gz", "./fallback_cache")
 
     ax_papers = search_alphaxiv(max_papers=60, interval="30+Days", wait=1)
-    logger.info(f"Fetched {len(ax_papers)} papers")
+    logger.info("Fetched %s papers", len(ax_papers))
     if HF_REPO_ID:
         upload_papers(ax_papers, HF_REPO_ID, "raw/alphaxiv.jsonl")
 
     hf_papers = search_huggingface(max_papers=100, days=2, wait=1)
-    logger.info(f"Fetched {len(hf_papers)} papers")
+    logger.info("Fetched %s papers", len(hf_papers))
     if HF_REPO_ID:
         upload_papers(hf_papers, HF_REPO_ID, "raw/huggingface.jsonl")
 
@@ -50,13 +50,13 @@ def main():
 
     df_stats = aggregate_stats(ax_stats + hf_stats)
 
-    logger.info(f"stats:\n{df_stats.head(50)}")
+    logger.info("stats:\n%s", df_stats.head(50))
 
     for i, arxiv_id in enumerate(df_stats["arxiv_id"].head(3), start=1):
         try:
             capture_arxiv_first_page(arxiv_id, f"top{i}.png")
         except Exception:
-            logger.exception(f"Failed to capture first page for {arxiv_id}")
+            logger.exception("Failed to capture first page for %s", arxiv_id)
 
     if GCS_BUCKET:
         save_dir(GCS_BUCKET, "fallback_cache.tar.gz", "./fallback_cache")

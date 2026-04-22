@@ -42,7 +42,7 @@ def fallback_cache(cache_dir: str = _DEFAULT_CACHE_DIR):
                 return output
             except Exception as e:
                 if has_cache:
-                    logger.warning(f"{func.__name__} raised {type(e).__name__}. Using cached result.")
+                    logger.warning("%s raised %s. Using cached result.", func.__name__, type(e).__name__)
                     return cached_func(*args, **kwargs)
                 raise RuntimeError(f"{func.__name__} raised an exception and no cache is available") from e
 

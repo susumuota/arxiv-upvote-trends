@@ -28,13 +28,13 @@ def _get_huggingface(api: HfApi, date: str, wait: float = 1.0) -> list[dict]:
     Returns:
         A list of paper dicts (up to _MAX_DAILY_PAPERS).
     """
-    logger.info(f"Fetching papers for date {date}")
+    logger.info("Fetching papers for date %s", date)
     all_papers = []
     p = 0
     while len(all_papers) < _MAX_DAILY_PAPERS:
         time.sleep(wait)
         papers = list(api.list_daily_papers(date=date, limit=_PAGE_SIZE, p=p))
-        logger.info(f"Fetched {len(papers)} papers for date {date} page {p}")
+        logger.info("Fetched %s papers for date %s page %s", len(papers), date, p)
         all_papers.extend(papers)
         if len(papers) < _PAGE_SIZE:
             break
@@ -60,7 +60,7 @@ def search_huggingface(max_papers: int = 300, days: int = 30, wait: float = 1.0)
     api = HfApi()
     now = datetime.now(tz=UTC)
     dates = [(now - timedelta(days=d)).strftime("%Y-%m-%d") for d in range(days)]
-    logger.info(f"Searching Hugging Face for papers: {dates}")
+    logger.info("Searching Hugging Face for papers: %s", dates)
     all_papers = []
     for date in dates:
         all_papers.extend(_get_huggingface(api, date=date, wait=wait))
