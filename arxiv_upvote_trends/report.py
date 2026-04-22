@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from html import escape
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 from pdf2image import convert_from_path
@@ -278,12 +278,12 @@ def _int(value: Any) -> int:
 
 def _trim_bottom_margin(image: Image.Image, margin: int = 72, threshold: int = 8) -> Image.Image:
     rgb_image = image.convert("RGB")
-    background = rgb_image.getpixel((0, rgb_image.height - 1))
+    background = cast(tuple[int, int, int], rgb_image.getpixel((0, rgb_image.height - 1)))
     step = 8
 
     for y in range(rgb_image.height - 1, -1, -1):
         for x in range(0, rgb_image.width, step):
-            pixel = rgb_image.getpixel((x, y))
+            pixel = cast(tuple[int, int, int], rgb_image.getpixel((x, y)))
             if any(abs(pixel[i] - background[i]) > threshold for i in range(3)):
                 bottom = min(rgb_image.height, y + margin)
                 return rgb_image.crop((0, 0, rgb_image.width, bottom))
