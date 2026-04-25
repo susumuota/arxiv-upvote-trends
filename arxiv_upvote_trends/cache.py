@@ -12,20 +12,10 @@ _DEFAULT_CACHE_DIR = "./fallback_cache"
 
 
 def fallback_cache(cache_dir: str = _DEFAULT_CACHE_DIR):
-    """
-    Decorator that falls back to a cached result when the wrapped function raises an exception.
+    """Return a decorator that falls back to cached results after wrapped-function failures.
 
     Each call attempts to execute the function and update the cache on success.
-    If the function raises, the most recent cached result is returned instead.
-    If no cache exists when an exception occurs, a RuntimeError is raised.
-
-    Args:
-        cache_dir: Directory to store the local cache.
-
-    Usage:
-        @fallback_cache(cache_dir="./cache")
-        def fetch_data(user_id: int) -> dict:
-            ...
+    If the function raises before any matching cache exists, a RuntimeError is raised.
     """
     memory = joblib.Memory(cache_dir, verbose=0)
 

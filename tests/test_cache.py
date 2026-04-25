@@ -38,13 +38,13 @@ def test_raises_when_no_cache(cache_dir):
 
 def test_fallback_to_cache_on_failure(cache_dir):
     fetch = make_flaky(cache_dir, fail_ids={2})
-    first = fetch(1)  # succeeds → cache created
-    second = fetch(1)  # fails → falls back to cache
+    first = fetch(1)  # succeeds -> cache created
+    second = fetch(1)  # fails -> falls back to cache
     assert second == first
 
 
 def test_cache_updated_on_success(cache_dir):
     fetch = make_flaky(cache_dir, fail_ids=set())
     first = fetch(1)  # v1
-    second = fetch(1)  # v2 (fresh result)
+    second = fetch(1)  # v2, fresh result
     assert second != first

@@ -25,18 +25,9 @@ def _get_alphaxiv(
     interval: str = "30+Days",
     wait: float = 1.0,
 ) -> list[dict]:
-    """Fetch a single page of papers from the alphaXiv API.
+    """Fetch one alphaXiv page after a throttling delay.
 
-    Args:
-        page_num: Zero-based page number to fetch.
-        interval: Time range filter (e.g. "3+Days", "7+Days", "30+Days", "90+Days", "All+time").
-        wait: Seconds to wait before making the request.
-
-    Returns:
-        A list of paper dicts.
-
-    Raises:
-        Exception: If the API returns an error.
+    Supported intervals are "3+Days", "7+Days", "30+Days", "90+Days", and "All+time".
     """
     url = f"https://api.alphaxiv.org/papers/v3/feed?pageNum={page_num}&sort={_SORT_BY}&pageSize={_PAGE_SIZE}&interval={interval}&topics=%5B%5D"
     referer = f"https://www.alphaxiv.org/?interval={interval}&sort={_SORT_BY}"
@@ -61,15 +52,8 @@ def search_alphaxiv(
 ) -> list[dict]:
     """Fetch trending papers from alphaXiv with pagination.
 
+    Supported intervals are "3+Days", "7+Days", "30+Days", "90+Days", and "All+time".
     Falls back to the cached result via fallback_cache when the API is unavailable.
-
-    Args:
-        max_papers: Maximum number of papers to fetch.
-        interval: Time range filter (e.g. "3+Days", "7+Days", "30+Days", "90+Days", "All+time").
-        wait: Seconds to wait before each request.
-
-    Returns:
-        A list of paper dicts (up to max_papers).
     """
     total_pages = math.ceil(max_papers / _PAGE_SIZE)
     pages = [_get_alphaxiv(page_num=page_num, interval=interval, wait=wait) for page_num in range(total_pages)]
@@ -77,7 +61,7 @@ def search_alphaxiv(
 
 
 def extract_alphaxiv_stats(paper: dict) -> dict:
-    """alphaXiv の検索結果から統計情報を抽出する。"""
+    """Extract ranking stats from an alphaXiv paper."""
     arxiv_id = str(paper.get("universal_paper_id") or "")
     return {
         "url": f"https://www.alphaxiv.org/abs/{arxiv_id}",

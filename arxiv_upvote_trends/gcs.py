@@ -12,14 +12,9 @@ logger = logging.getLogger(__name__)
 
 
 def restore_dir(bucket_name: str, blob_name: str, local_dir: str) -> None:
-    """Download a tarball from GCS and extract it to local_dir.
+    """Restore a local directory from a GCS tarball.
 
     If the blob does not exist (first run), this is a no-op.
-
-    Args:
-        bucket_name: GCS bucket name.
-        blob_name: Blob name of the tar.gz archive in the bucket.
-        local_dir: Local directory to extract into.
     """
     client = storage.Client()
     bucket = client.bucket(bucket_name)
@@ -40,14 +35,9 @@ def restore_dir(bucket_name: str, blob_name: str, local_dir: str) -> None:
 
 
 def save_dir(bucket_name: str, blob_name: str, local_dir: str) -> None:
-    """Compress local_dir into a tarball and upload it to GCS.
+    """Upload a local directory to GCS as a tarball.
 
     If local_dir does not exist, this is a no-op.
-
-    Args:
-        bucket_name: GCS bucket name.
-        blob_name: Blob name of the tar.gz archive in the bucket.
-        local_dir: Local directory to compress and upload.
     """
     local_path = Path(local_dir)
     if not local_path.exists():

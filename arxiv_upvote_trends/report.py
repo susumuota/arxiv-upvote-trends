@@ -140,7 +140,10 @@ def render_report_pdf(html_path: str | Path, output_path: str | Path) -> Path:
 
 
 def convert_pdf_to_png(pdf_path: str | Path, output_path: str | Path, dpi: int = 180) -> Path:
-    """Convert a report PDF to a single PNG image."""
+    """Convert a report PDF to a single PNG image.
+
+    Multiple pages are stacked vertically before trimming the bottom margin.
+    """
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     images = convert_from_path(pdf_path, dpi=dpi)

@@ -18,16 +18,7 @@ _MAX_DAILY_PAPERS = 300
 
 
 def _get_huggingface(api: HfApi, date: str, wait: float = 1.0) -> list[dict]:
-    """Fetch papers for a given date with pagination.
-
-    Args:
-        api: HfApi instance.
-        date: Target date in YYYY-MM-DD format.
-        wait: Seconds to wait before each request.
-
-    Returns:
-        A list of paper dicts (up to _MAX_DAILY_PAPERS).
-    """
+    """Fetch one date of Hugging Face Daily Papers with pagination."""
     logger.info("Fetching papers for date %s", date)
     all_papers = []
     p = 0
@@ -48,14 +39,6 @@ def search_huggingface(max_papers: int = 300, days: int = 30, wait: float = 1.0)
 
     Iterates from the most recent date backwards, stopping once max_papers is reached.
     Falls back to the cached result via fallback_cache when the API is unavailable.
-
-    Args:
-        max_papers: Maximum number of papers to fetch.
-        days: Number of days to look back.
-        wait: Seconds to wait before each request.
-
-    Returns:
-        A list of paper dicts (up to max_papers).
     """
     api = HfApi()
     now = datetime.now(tz=UTC)
@@ -70,7 +53,7 @@ def search_huggingface(max_papers: int = 300, days: int = 30, wait: float = 1.0)
 
 
 def extract_huggingface_stats(paper: dict) -> dict:
-    """Hugging Face の検索結果から統計情報を抽出する。"""
+    """Extract ranking stats from a Hugging Face Daily Paper."""
     arxiv_id = str(paper.get("id") or "")
     return {
         "url": f"https://huggingface.co/papers/{arxiv_id}",

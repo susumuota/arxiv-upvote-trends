@@ -15,16 +15,9 @@ _USER_AGENT = (
 
 
 def capture_arxiv_first_page(arxiv_id: str, output_path: str, dpi: int = 200, timeout: float = 30) -> str:
-    """Download an arXiv PDF and save the first page as an image.
+    """Render the first page of an arXiv PDF to a PNG file.
 
-    Args:
-        arxiv_id: arXiv paper ID (e.g. "2603.10165").
-        output_path: File path to save the image.
-        dpi: Image resolution. 150-300 is typical.
-        timeout: Request timeout in seconds.
-
-    Returns:
-        The output file path.
+    Higher DPI improves text sharpness at the cost of slower conversion and larger output.
     """
     url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
     referer = f"https://arxiv.org/abs/{arxiv_id}"

@@ -12,16 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def upload_papers(papers: list[dict], repo_id: str, filename: str) -> str:
-    """Save papers as JSONL and upload to a Hugging Face Dataset repo.
-
-    Args:
-        papers: List of paper dicts from search_alphaxiv.
-        repo_id: Hugging Face dataset repo ID (e.g. "username/arxiv-upvote-trends").
-        filename: Name of the JSONL file in the repo.
-
-    Returns:
-        URL of the dataset repo.
-    """
+    """Upload papers as JSONL to a Hugging Face Dataset repo."""
     api = HfApi()
 
     with io.BytesIO() as buf:
@@ -41,14 +32,6 @@ def upload_papers(papers: list[dict], repo_id: str, filename: str) -> str:
 
 
 def download_papers(repo_id: str, filename) -> list[dict]:
-    """Download papers from a Hugging Face Dataset repo.
-
-    Args:
-        repo_id: Hugging Face dataset repo ID (e.g. "username/arxiv-upvote-trends").
-        filename: Name of the JSONL file in the repo.
-
-    Returns:
-        List of paper dicts.
-    """
+    """Download papers from a Hugging Face Dataset repo."""
     ds = load_dataset(repo_id, data_files=filename)
     return [dict(row) for row in ds["train"]]
