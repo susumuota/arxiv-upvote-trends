@@ -96,6 +96,9 @@ def report_html(rows: list[ReportRow], generated_at: datetime | None = None) -> 
     total_comments = sum(row.num_comments for row in rows)
     source_hits = sum(row.count for row in rows)
 
+    total_alphaxiv = sum(row.alphaxiv_score for row in rows)
+    total_huggingface = sum(row.huggingface_score for row in rows)
+
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -108,21 +111,20 @@ def report_html(rows: list[ReportRow], generated_at: datetime | None = None) -> 
 <body>
 <main class="page">
   <header class="report-header">
-    <div>
-      <p class="kicker">alphaXiv + Hugging Face</p>
-      <h1>arXiv Upvote Trends Top {len(rows)}</h1>
-      <p class="generated">Generated {escape(generated_text)}</p>
-    </div>
+    <p class="kicker">Live &middot; alphaXiv &times; Hugging Face</p>
+    <h1>arXiv Upvote Trends — Top {len(rows)}</h1>
+    <p class="generated">Generated {escape(generated_text)}</p>
     <dl class="summary">
       <div><dt>Papers</dt><dd>{len(rows)}</dd></div>
-      <div><dt>Score</dt><dd>{total_score:,}</dd></div>
-      <div><dt>Comments</dt><dd>{total_comments:,}</dd></div>
-      <div><dt>Source Hits</dt><dd>{source_hits:,}</dd></div>
+      <div><dt>Total Score</dt><dd>{total_score:,}</dd></div>
+      <div><dt>alphaXiv</dt><dd>{total_alphaxiv:,}</dd></div>
+      <div><dt>Hugging Face</dt><dd>{total_huggingface:,}</dd></div>
     </dl>
   </header>
   <section class="paper-list" aria-label="Top papers">
     {_paper_rows_html(rows)}
   </section>
+  <p class="footer">Total comments {total_comments:,} · Source hits {source_hits:,} · arxiv-upvote-trends</p>
 </main>
 </body>
 </html>
@@ -167,38 +169,55 @@ def convert_pdf_to_png(pdf_path: str | Path, output_path: str | Path, dpi: int =
 
 
 def _paper_rows_html(rows: list[ReportRow]) -> str:
-    return "\n".join(_paper_row_html(row) for row in rows)
+    max_score = max((row.score for row in rows), default=1) or 1
+    return "\n".join(_paper_row_html(row, max_score) for row in rows)
 
 
-def _paper_row_html(row: ReportRow) -> str:
-    links = _links_html(row)
+def _paper_row_html(row: ReportRow, max_score: int) -> str:
     authors = f'<p class="authors">{escape(row.authors)}</p>' if row.authors else ""
-    return f"""    <article class="paper">
-      <div class="rank">{row.rank}</div>
+    ax_pct = row.alphaxiv_score / max_score * 100
+    hf_pct = row.huggingface_score / max_score * 100
+    rank_class = f" top{row.rank}" if row.rank <= 3 else ""
+    return f"""    <article class="paper{rank_class}">
+      <div class="rank-badge">
+        <span class="rank-num">{row.rank:02d}</span>
+        <span class="rank-label">Rank</span>
+      </div>
       <div class="paper-main">
         <h2>{escape(row.title)}</h2>
         {authors}
         <div class="meta">
-          <span>{escape(row.arxiv_id)}</span>
-          {links}
+          <span class="tag">{escape(row.arxiv_id)}</span>
+          {_link_tags_html(row)}
         </div>
       </div>
-      <div class="metrics">
-        <div class="metric total"><span>Total</span><strong>{row.score:,}</strong></div>
-        <div class="metric"><span>alphaXiv</span><strong>{row.alphaxiv_score:,}</strong></div>
-        <div class="metric"><span>HF</span><strong>{row.huggingface_score:,}</strong></div>
-        <div class="metric"><span>Comments</span><strong>{row.num_comments:,}</strong></div>
+      <div class="score-row">
+        <div class="score-total">{row.score:,}<small>Total</small></div>
+        <div class="bar-col">
+          <div class="bar">
+            <div class="bar-ax" style="width:{ax_pct:.1f}%"></div>
+            <div class="bar-hf" style="width:{hf_pct:.1f}%"></div>
+          </div>
+          <div class="bar-caption">
+            <span class="cap-ax">alphaXiv {row.alphaxiv_score:,}</span>
+            <span class="cap-sep">·</span>
+            <span class="cap-hf">HF {row.huggingface_score:,}</span>
+          </div>
+        </div>
+        <div class="score-comments">{row.num_comments:,}<small>Comments</small></div>
       </div>
     </article>"""
 
 
-def _links_html(row: ReportRow) -> str:
+def _link_tags_html(row: ReportRow) -> str:
     links = [
-        ("arXiv", row.arxiv_url),
-        ("alphaXiv", row.alphaxiv_url),
-        ("Hugging Face", row.huggingface_url),
+        ("arXiv", row.arxiv_url, "arxiv"),
+        ("alphaXiv", row.alphaxiv_url, "ax"),
+        ("Hugging Face", row.huggingface_url, "hf"),
     ]
-    return "".join(f'<a href="{escape(url)}">{escape(label)}</a>' for label, url in links if url)
+    return "".join(
+        f'<a class="tag link {cls}" href="{escape(url)}">{escape(label)}</a>' for label, url, cls in links if url
+    )
 
 
 def _index_papers(papers: list[dict], keys: Iterable[str]) -> dict[str, dict]:
@@ -295,7 +314,7 @@ def _trim_bottom_margin(image: Image.Image, margin: int = 72, threshold: int = 8
 
 _CSS = """
 @page {
-  size: 1400px 5000px;
+  size: 1400px 9000px;
   margin: 0;
 }
 
@@ -305,43 +324,61 @@ _CSS = """
 
 body {
   margin: 0;
-  background: #eef1f4;
-  color: #19212a;
+  background: #f4f5f7;
+  color: #0f172a;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 18px;
-  letter-spacing: 0;
+  font-size: 17px;
+  line-height: 1.3;
 }
 
 .page {
   width: 1400px;
   padding: 48px;
-  background: #f8fafc;
 }
 
 .report-header {
-  padding-bottom: 28px;
-  border-bottom: 4px solid #1d4f64;
+  padding: 36px 40px;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+  border-radius: 24px;
+  color: #f8fafc;
 }
 
 .kicker {
-  margin: 0 0 10px;
-  color: #1d4f64;
-  font-size: 19px;
-  font-weight: 800;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 16px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.10);
+  border-radius: 999px;
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
+}
+
+.kicker::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  background: #34d399;
+  border-radius: 50%;
 }
 
 h1 {
   margin: 0;
-  color: #101820;
-  font-size: 62px;
-  line-height: 1;
+  color: #f8fafc;
+  font-size: 56px;
+  line-height: 1.0;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .generated {
   margin: 14px 0 0;
-  color: #5b6773;
-  font-size: 18px;
+  color: #94a3b8;
+  font-size: 14px;
 }
 
 .summary {
@@ -352,58 +389,74 @@ h1 {
 }
 
 .summary div {
-  padding: 14px;
-  background: #ffffff;
-  border: 1px solid #d7dee6;
-  border-radius: 8px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
 }
 
 .summary dt {
-  color: #5b6773;
-  font-size: 13px;
-  font-weight: 800;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
 .summary dd {
-  margin: 5px 0 0;
-  color: #101820;
+  margin: 6px 0 0;
+  color: #f8fafc;
   font-size: 28px;
-  font-weight: 850;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .paper-list {
-  padding-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 16px;
 }
 
 .paper {
   display: grid;
-  grid-template-columns: 54px minmax(0, 1fr) 410px;
-  gap: 18px;
+  grid-template-columns: 56px minmax(0, 1fr) 360px;
+  gap: 20px;
   align-items: center;
-  min-height: 61px;
-  padding: 10px 14px 10px 10px;
+  min-height: 76px;
+  padding: 8px 20px;
   background: #ffffff;
-  border: 1px solid #dbe2e8;
-  border-radius: 8px;
+  border-radius: 14px;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
-.paper + .paper {
-  margin-top: 10px;
-}
-
-.rank {
+.rank-badge {
   display: flex;
+  flex-direction: column;
+  gap: 2px;
   align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  background: #1d4f64;
-  border-radius: 50%;
-  color: #ffffff;
-  font-size: 20px;
-  font-weight: 850;
 }
+
+.rank-num {
+  color: #0f172a;
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.rank-label {
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.paper.top1 .rank-num { color: #d97706; }
+.paper.top2 .rank-num { color: #64748b; }
+.paper.top3 .rank-num { color: #b45309; }
 
 .paper-main {
   min-width: 0;
@@ -412,17 +465,18 @@ h1 {
 h2 {
   margin: 0;
   overflow: hidden;
-  color: #101820;
-  font-size: 19px;
-  line-height: 1.18;
+  color: #0f172a;
+  font-size: 18px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.005em;
 }
 
 .authors {
-  margin: 3px 0 0;
+  margin: 5px 0 0;
   overflow: hidden;
-  color: #5b6773;
-  font-size: 14px;
-  line-height: 1.25;
+  color: #64748b;
+  font-size: 13px;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -432,61 +486,125 @@ h2 {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  margin-top: 5px;
-  color: #65717e;
-  font-size: 13px;
-  font-weight: 700;
+  margin-top: 8px;
+  font-size: 11px;
 }
 
-.meta span,
-.meta a {
-  color: #39536a;
+.tag {
+  padding: 3px 9px;
+  background: #eef2f7;
+  border-radius: 999px;
+  color: #475569;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
   text-decoration: none;
 }
 
-.meta a {
-  padding-left: 8px;
-  border-left: 1px solid #cbd5df;
-}
+.tag.link.arxiv { background: #eff6ff; color: #1d4ed8; }
+.tag.link.ax { background: #f5f3ff; color: #6d28d9; }
+.tag.link.hf { background: #fff7e6; color: #92400e; }
 
-.metrics {
+.score-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
 }
 
-.metric {
-  min-width: 0;
-  padding: 8px 7px;
-  background: #f3f6f8;
-  border-radius: 7px;
-  text-align: right;
+.bar-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.metric span {
-  display: block;
-  overflow: hidden;
-  color: #687684;
-  font-size: 11px;
-  font-weight: 850;
-  text-transform: uppercase;
+.bar-caption {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  align-items: baseline;
   white-space: nowrap;
-  text-overflow: ellipsis;
+  color: #64748b;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
 }
 
-.metric strong {
+.bar-caption .cap-sep { color: #cbd5e1; }
+
+.bar-caption .cap-ax::before,
+.bar-caption .cap-hf::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+.bar-caption .cap-ax::before { background: #8b5cf6; }
+.bar-caption .cap-hf::before { background: #f59e0b; }
+
+.score-total {
+  color: #0f172a;
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-total small {
+  display: block;
+  margin-top: 4px;
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.bar {
+  display: flex;
+  height: 10px;
+  overflow: hidden;
+  background: #eef2f7;
+  border-radius: 999px;
+}
+
+.bar-ax {
+  height: 100%;
+  background: #8b5cf6;
+}
+
+.bar-hf {
+  height: 100%;
+  background: #f59e0b;
+}
+
+.score-comments {
+  color: #0f172a;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-comments small {
   display: block;
   margin-top: 2px;
-  color: #17212b;
-  font-size: 22px;
-  line-height: 1;
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
-.metric.total {
-  background: #e5f3ee;
-}
-
-.metric.total strong {
-  color: #126044;
+.footer {
+  margin-top: 24px;
+  color: #94a3b8;
+  font-size: 12px;
+  text-align: center;
 }
 """
