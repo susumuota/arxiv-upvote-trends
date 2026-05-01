@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Susumu Ota
 # SPDX-License-Identifier: MIT
 
+import logging
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -33,6 +34,27 @@ def test_main_posts_to_bluesky_without_passing_config(monkeypatch):
     post_to_bluesky.assert_called_once()
     assert post_to_bluesky.call_args.args[0].startswith("arXiv Upvote Trends\nNo papers found.\nGenerated ")
     assert post_to_bluesky.call_args.kwargs == {}
+
+
+def test_main_continues_when_bluesky_post_fails(monkeypatch, caplog):
+    _set_base_config(monkeypatch)
+    monkeypatch.setattr(main_module, "GCS_BUCKET", "cache-bucket")
+    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    post_to_bluesky = Mock(side_effect=RuntimeError("failed"))
+    restore_dir = Mock()
+    save_dir = Mock()
+    monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
+    monkeypatch.setattr(main_module, "restore_dir", restore_dir)
+    monkeypatch.setattr(main_module, "save_dir", save_dir)
+    _stub_pipeline(monkeypatch)
+
+    with caplog.at_level(logging.WARNING):
+        main_module.main()
+
+    post_to_bluesky.assert_called_once()
+    restore_dir.assert_called_once_with("cache-bucket", "fallback_cache.tar.gz", "./fallback_cache")
+    save_dir.assert_called_once_with("cache-bucket", "fallback_cache.tar.gz", "./fallback_cache")
+    assert "Skipping Bluesky post after RuntimeError." in caplog.text
 
 
 def test_main_filters_non_arxiv_ids_before_reporting(monkeypatch):

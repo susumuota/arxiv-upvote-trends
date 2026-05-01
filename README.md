@@ -116,12 +116,12 @@ uv run --frozen --no-dev python main.py  # Run on the host
 ### Run in a local Docker container
 
 ```bash
-IMAGE_NAME="arxiv-upvote-trends"
-
 gcloud auth application-default login  # First time only
 
 # 1 CPU, 1GB Memory, 10GB Disk, similar to Cloud Run Jobs free tier
 # colima start -c 1 -m 1 -d 10
+
+IMAGE_NAME="arxiv-upvote-trends"
 
 docker build -t "$IMAGE_NAME" .
 
@@ -192,9 +192,9 @@ gcloud artifacts repositories list-cleanup-policies "$REPO_NAME" \
 Build and push the image:
 
 ```bash
-IMAGE_NAME="arxiv-upvote-trends"
-
 gcloud services enable cloudbuild.googleapis.com --project="$GOOGLE_CLOUD_PROJECT"
+
+IMAGE_NAME="arxiv-upvote-trends"
 
 gcloud builds submit \
     --tag="${REGION}-docker.pkg.dev/${GOOGLE_CLOUD_PROJECT}/${REPO_NAME}/${IMAGE_NAME}" \
