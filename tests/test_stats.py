@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Susumu Ota
 # SPDX-License-Identifier: MIT
 
-from arxiv_upvote_trends import aggregate_stats
+from arxiv_upvote_trends import aggregate_stats, is_arxiv_id
 
 
 def test_aggregate_stats_combines_sources_by_arxiv_id():
@@ -67,3 +67,26 @@ def test_aggregate_stats_returns_empty_frame_for_empty_input():
 
     assert result.empty
     assert result.columns.to_list() == ["arxiv_id", "score", "num_comments", "count", "url"]
+
+
+def test_is_arxiv_id_accepts_new_style_ids():
+    assert is_arxiv_id("0704.0001")
+    assert is_arxiv_id("1412.9999")
+    assert is_arxiv_id("1501.00001")
+    assert is_arxiv_id("2603.10165")
+    assert is_arxiv_id("2603.10165v2")
+
+
+def test_is_arxiv_id_rejects_non_arxiv_ids():
+    assert not is_arxiv_id("")
+    assert not is_arxiv_id("deepseek-v4")
+    assert not is_arxiv_id("arXiv:2603.10165")
+    assert not is_arxiv_id("https://arxiv.org/abs/2603.10165")
+    assert not is_arxiv_id("alg-geom/9701001")
+    assert not is_arxiv_id("hep-th/9901001")
+    assert not is_arxiv_id("math.GT/0309136")
+    assert not is_arxiv_id("0703.0001")
+    assert not is_arxiv_id("0704.0000")
+    assert not is_arxiv_id("1412.00001")
+    assert not is_arxiv_id("1501.0001")
+    assert not is_arxiv_id("2603.10165v0")

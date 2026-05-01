@@ -51,6 +51,21 @@ Omit `--private` to make the repository public.
 hf repos create $HF_REPO_ID --type dataset --private
 ```
 
+### Bluesky posting (optional)
+
+Setup steps for posting the aggregated top papers to Bluesky. Create an app password in Bluesky settings.
+For local runs, set the posting configuration in `.env`. For Cloud Run Jobs, store the app password in
+Secret Manager and inject it as `BLUESKY_APP_PASSWORD`.
+`post_to_bluesky()` reads `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`, and `BLUESKY_SERVICE_URL` internally.
+
+```bash
+BLUESKY_HANDLE=your-handle.bsky.social
+BLUESKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+BLUESKY_SERVICE_URL=https://bsky.social
+```
+
+If `BLUESKY_HANDLE` is empty or unset, the job skips posting.
+
 ### GCS bucket (optional)
 
 Setup steps for using a GCS bucket to persist `fallback_cache`. If not needed, disable it with `unset GCS_BUCKET`.
@@ -104,6 +119,9 @@ uv run --frozen --no-dev python main.py  # Run on the host
 IMAGE_NAME="arxiv-upvote-trends"
 
 gcloud auth application-default login  # First time only
+
+# 1 CPU, 1GB Memory, 10GB Disk, similar to Cloud Run Jobs free tier
+# colima start -c 1 -m 1 -d 10
 
 docker build -t "$IMAGE_NAME" .
 
@@ -207,12 +225,21 @@ echo -n "$HF_TOKEN" | gcloud secrets create HF_TOKEN \
     --data-file=- \
     --project="$GOOGLE_CLOUD_PROJECT"
 
+echo -n "$BLUESKY_APP_PASSWORD" | gcloud secrets create BLUESKY_APP_PASSWORD \
+    --data-file=- \
+    --project="$GOOGLE_CLOUD_PROJECT"
+
 gcloud secrets add-iam-policy-binding HF_TOKEN \
     --member="serviceAccount:${SA_NAME}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
     --role="roles/secretmanager.secretAccessor" \
     --project="$GOOGLE_CLOUD_PROJECT"
 
-gcloud secrets versions access latest --secret=HF_TOKEN --project="$GOOGLE_CLOUD_PROJECT"
+gcloud secrets add-iam-policy-binding BLUESKY_APP_PASSWORD \
+    --member="serviceAccount:${SA_NAME}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+    --role="roles/secretmanager.secretAccessor" \
+    --project="$GOOGLE_CLOUD_PROJECT"
+
+gcloud secrets describe HF_TOKEN --project="$GOOGLE_CLOUD_PROJECT"
 
 gcloud services enable run.googleapis.com --project="$GOOGLE_CLOUD_PROJECT"
 
@@ -221,8 +248,8 @@ gcloud run jobs create "$JOB_NAME" \
     --region="$REGION" \
     --project="$GOOGLE_CLOUD_PROJECT" \
     --service-account="${SA_NAME}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
-    --set-env-vars="GCS_BUCKET=${GCS_BUCKET},HF_REPO_ID=${HF_REPO_ID}" \
-    --set-secrets="HF_TOKEN=HF_TOKEN:latest" \
+    --set-env-vars="GCS_BUCKET=${GCS_BUCKET},HF_REPO_ID=${HF_REPO_ID},BLUESKY_HANDLE=${BLUESKY_HANDLE},BLUESKY_SERVICE_URL=${BLUESKY_SERVICE_URL}" \
+    --set-secrets="HF_TOKEN=HF_TOKEN:latest,BLUESKY_APP_PASSWORD=BLUESKY_APP_PASSWORD:latest" \
     --max-retries=0 \
     --task-timeout=30m \
     --memory=1024Mi

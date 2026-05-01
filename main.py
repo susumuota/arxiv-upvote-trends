@@ -8,11 +8,14 @@ from dotenv import load_dotenv
 
 from arxiv_upvote_trends import (
     aggregate_stats,
+    build_bluesky_post,
     build_report_rows,
     capture_arxiv_first_page,
     convert_pdf_to_png,
     extract_alphaxiv_stats,
     extract_huggingface_stats,
+    is_arxiv_id,
+    post_to_bluesky,
     render_report_html,
     render_report_pdf,
     restore_dir,
@@ -39,12 +42,12 @@ def main():
     if GCS_BUCKET:
         restore_dir(GCS_BUCKET, "fallback_cache.tar.gz", "./fallback_cache")
 
-    ax_papers = search_alphaxiv(max_papers=1000, interval="30+Days", wait=1)
+    ax_papers = search_alphaxiv(max_papers=20, interval="30+Days", wait=1)
     logger.info("Fetched %s papers", len(ax_papers))
     if HF_REPO_ID:
         upload_papers(ax_papers, HF_REPO_ID, "raw/alphaxiv.jsonl")
 
-    hf_papers = search_huggingface(max_papers=1000, days=30, wait=1)
+    hf_papers = search_huggingface(max_papers=20, days=2, wait=1)
     logger.info("Fetched %s papers", len(hf_papers))
     if HF_REPO_ID:
         upload_papers(hf_papers, HF_REPO_ID, "raw/huggingface.jsonl")
@@ -53,6 +56,11 @@ def main():
     hf_stats = [extract_huggingface_stats(p) for p in hf_papers]
 
     df_stats = aggregate_stats(ax_stats + hf_stats)
+    valid_arxiv_id_mask = df_stats["arxiv_id"].map(is_arxiv_id)
+    invalid_arxiv_ids = df_stats.loc[~valid_arxiv_id_mask, "arxiv_id"].to_list()
+    if invalid_arxiv_ids:
+        logger.info("Skipping non-arXiv IDs: %s", invalid_arxiv_ids[:10])
+    df_stats = df_stats.loc[valid_arxiv_id_mask].reset_index(drop=True)
 
     logger.info("stats:\n%s", df_stats.head(50))
 
@@ -61,6 +69,12 @@ def main():
     report_pdf_path = render_report_pdf(report_html_path, "reports/top30.pdf")
     report_png_path = convert_pdf_to_png(report_pdf_path, "reports/top30.png")
     logger.info("Saved top 30 report to %s", report_png_path)
+
+    if os.environ.get("BLUESKY_HANDLE", ""):
+        post_text = build_bluesky_post(report_rows, limit=5)
+        # post_to_bluesky reads BLUESKY_HANDLE, BLUESKY_APP_PASSWORD, and BLUESKY_SERVICE_URL internally.
+        post_result = post_to_bluesky(post_text)
+        logger.info("Posted Bluesky update: uri=%s cid=%s", post_result.uri, post_result.cid)
 
     for i, arxiv_id in enumerate(df_stats["arxiv_id"].head(3), start=1):
         try:
