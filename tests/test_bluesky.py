@@ -94,7 +94,9 @@ def test_post_to_bluesky_requires_credentials(monkeypatch):
         post_to_bluesky("hello")
 
 
-def test_post_to_bluesky_rejects_long_text():
+def test_post_to_bluesky_rejects_long_text(monkeypatch):
+    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    monkeypatch.setenv("BLUESKY_APP_PASSWORD", "app-password")
     with pytest.raises(ValueError, match="300"):
         post_to_bluesky("x" * 301)
 
