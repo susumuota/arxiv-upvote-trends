@@ -192,6 +192,8 @@ gcloud artifacts repositories list-cleanup-policies "$REPO_NAME" \
 Build and push the image:
 
 ```bash
+IMAGE_NAME="arxiv-upvote-trends"
+
 gcloud services enable cloudbuild.googleapis.com --project="$GOOGLE_CLOUD_PROJECT"
 
 gcloud builds submit \
