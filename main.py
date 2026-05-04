@@ -84,9 +84,9 @@ def main():
 
     if os.environ.get("BLUESKY_HANDLE", ""):
         post_text = build_bluesky_post(report_rows, limit=5)
-        # post_to_bluesky reads BLUESKY_HANDLE, BLUESKY_APP_PASSWORD, and BLUESKY_SERVICE_URL internally.
         try:
             logger.info("Posting Bluesky update")
+            # post_to_bluesky reads BLUESKY_HANDLE, BLUESKY_APP_PASSWORD, and BLUESKY_SERVICE_URL internally.
             post_result = post_to_bluesky(post_text)
         except Exception as e:
             logger.warning("Skipping Bluesky post after %s.", type(e).__name__)

@@ -1,8 +1,6 @@
 # Copyright (c) 2026 Susumu Ota
 # SPDX-License-Identifier: MIT
 
-from __future__ import annotations
-
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime

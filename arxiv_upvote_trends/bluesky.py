@@ -1,8 +1,6 @@
 # Copyright (c) 2026 Susumu Ota
 # SPDX-License-Identifier: MIT
 
-from __future__ import annotations
-
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass
