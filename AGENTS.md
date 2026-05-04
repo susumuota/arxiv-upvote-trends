@@ -19,6 +19,6 @@
 - Proper noun casing: `alphaXiv`, `Hugging Face` (function and module names are lowercase)
 - When calling functions, pass positional arguments without keywords and keyword arguments (those with defaults) with keywords
 
-## Git
+## Git Workflow
 
-- Always use the `/git-commit` skill for commits.
+- Do NOT follow the default git commit workflow. You MUST use the `/git-commit` skill instead.
