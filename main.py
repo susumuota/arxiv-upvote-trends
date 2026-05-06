@@ -104,14 +104,14 @@ def main():
         else:
             logger.info("Posted Bluesky update: uri=%s cid=%s", post_result.uri, post_result.cid)
 
-    for i, arxiv_id in enumerate(df_stats["arxiv_id"].head(3), start=1):
+    for row in [row for row in report_rows if row.is_new]:
         try:
-            logger.info("Capturing arXiv first page for %s", arxiv_id)
-            capture_arxiv_first_page(arxiv_id, f"top{i}.png")
+            logger.info("Capturing arXiv first page for %s", row.arxiv_id)
+            capture_arxiv_first_page(row.arxiv_id, f"reports/{row.arxiv_id}.png")
         except Exception:
-            logger.exception("Failed to capture first page for %s", arxiv_id)
+            logger.exception("Failed to capture first page for %s", row.arxiv_id)
         else:
-            logger.info("Captured arXiv first page for %s", arxiv_id)
+            logger.info("Captured arXiv first page for %s", row.arxiv_id)
 
     if GCS_BUCKET:
         logger.info("Saving persistent data to GCS")

@@ -3,7 +3,8 @@
 
 import logging
 from pathlib import Path
-from unittest.mock import Mock
+from types import SimpleNamespace
+from unittest.mock import Mock, call
 
 import pandas as pd
 
@@ -67,12 +68,39 @@ def test_main_filters_non_arxiv_ids_before_reporting(monkeypatch):
         ]
     )
     mocks = _stub_pipeline(monkeypatch, stats=stats)
+    mocks["build_report_rows"].return_value = [_report_row("2604.00001", is_new=True)]
 
     main_module.main()
 
     filtered_stats = mocks["build_report_rows"].call_args.args[0]
     assert filtered_stats["arxiv_id"].to_list() == ["2604.00001"]
-    mocks["capture_arxiv_first_page"].assert_called_once_with("2604.00001", "top1.png")
+    mocks["capture_arxiv_first_page"].assert_called_once_with("2604.00001", "reports/2604.00001.png")
+
+
+def test_main_captures_first_pages_only_for_new_report_rows(monkeypatch):
+    _set_base_config(monkeypatch)
+    monkeypatch.delenv("BLUESKY_HANDLE", raising=False)
+    stats = pd.DataFrame(
+        [
+            {"arxiv_id": "2604.00001", "score": 10, "num_comments": 1, "count": 1, "url": []},
+            {"arxiv_id": "2604.00002", "score": 9, "num_comments": 0, "count": 1, "url": []},
+            {"arxiv_id": "2604.00003", "score": 8, "num_comments": 0, "count": 1, "url": []},
+        ]
+    )
+    report_rows = [
+        _report_row("2604.00001", is_new=False),
+        _report_row("2604.00002", is_new=True),
+        _report_row("2604.00003", is_new=True),
+    ]
+    mocks = _stub_pipeline(monkeypatch, stats=stats)
+    mocks["build_report_rows"].return_value = report_rows
+
+    main_module.main()
+
+    assert mocks["capture_arxiv_first_page"].call_args_list == [
+        call("2604.00002", "reports/2604.00002.png"),
+        call("2604.00003", "reports/2604.00003.png"),
+    ]
 
 
 def _set_base_config(monkeypatch):
@@ -108,3 +136,7 @@ def _stub_pipeline(monkeypatch, stats: pd.DataFrame | None = None) -> dict[str, 
 
 def _empty_stats() -> pd.DataFrame:
     return pd.DataFrame(columns=["arxiv_id", "score", "num_comments", "count", "url"])
+
+
+def _report_row(arxiv_id: str, is_new: bool) -> SimpleNamespace:
+    return SimpleNamespace(arxiv_id=arxiv_id, is_new=is_new)
