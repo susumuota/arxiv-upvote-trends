@@ -114,6 +114,27 @@ def test_post_to_bluesky_attaches_images(mock_client_cls, monkeypatch, tmp_path)
 
 
 @patch("arxiv_upvote_trends.bluesky.Client")
+def test_post_to_bluesky_logs_image_upload_and_post_creation(mock_client_cls, monkeypatch, tmp_path, caplog):
+    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    monkeypatch.setenv("BLUESKY_APP_PASSWORD", "app-password")
+    image_path = tmp_path / "2604.00001.png"
+    Image.new("RGB", (20, 10), "white").save(image_path)
+    mock_client = mock_client_cls.return_value
+    mock_client.upload_blob.return_value = SimpleNamespace(blob=BlobRef(mimeType="image/png", size=1, ref="blob-ref"))
+    mock_client.send_post.return_value = SimpleNamespace(uri="at://did/example", cid="cid-value")
+
+    with caplog.at_level("INFO"):
+        post_to_bluesky("hello", image_path=image_path, image_alt="First page")
+
+    assert "Logging in to Bluesky as user.bsky.social via https://bsky.social" in caplog.text
+    assert f"Preparing Bluesky image {image_path}" in caplog.text
+    assert f"Uploading Bluesky image {image_path} width=20 height=10" in caplog.text
+    assert f"Uploaded Bluesky image {image_path}" in caplog.text
+    assert "Sending Bluesky post text_length=5 has_image=True" in caplog.text
+    assert "Sent Bluesky post uri=at://did/example cid=cid-value" in caplog.text
+
+
+@patch("arxiv_upvote_trends.bluesky.Client")
 def test_post_to_bluesky_sends_one_image_per_post(mock_client_cls, monkeypatch, tmp_path):
     monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
     monkeypatch.setenv("BLUESKY_APP_PASSWORD", "app-password")
@@ -187,7 +208,7 @@ def test_post_to_bluesky_sanitizes_atproto_errors(mock_client_cls, monkeypatch):
     with pytest.raises(RuntimeError) as exc_info:
         post_to_bluesky("hello")
 
-    assert str(exc_info.value) == "Failed to post to Bluesky: AtProtocolError"
+    assert str(exc_info.value) == "Failed to post to Bluesky during login: AtProtocolError"
     assert "app-password" not in str(exc_info.value)
     assert exc_info.value.__cause__ is None
 
@@ -202,7 +223,7 @@ def test_post_to_bluesky_sanitizes_send_post_errors(mock_client_cls, monkeypatch
     with pytest.raises(RuntimeError) as exc_info:
         post_to_bluesky("hello")
 
-    assert str(exc_info.value) == "Failed to post to Bluesky: AtProtocolError"
+    assert str(exc_info.value) == "Failed to post to Bluesky during post creation: AtProtocolError"
     assert "app-password" not in str(exc_info.value)
     assert exc_info.value.__cause__ is None
 

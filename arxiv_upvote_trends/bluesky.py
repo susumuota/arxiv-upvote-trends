@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Susumu Ota
 # SPDX-License-Identifier: MIT
 
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +16,7 @@ DEFAULT_SERVICE_URL = "https://bsky.social"
 MAX_POST_LENGTH = 300
 MAX_IMAGE_BYTES = 1_000_000
 _MIN_TITLE_LENGTH = 12
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -66,13 +68,25 @@ def post_to_bluesky(
     if len(text) > MAX_POST_LENGTH:
         raise ValueError(f"Bluesky post must be {MAX_POST_LENGTH} characters or fewer")
 
+    phase = "login"
     try:
         client = Client(base_url=service_url)
+        logger.info("Logging in to Bluesky as %s via %s", handle, service_url)
         client.login(login=handle, password=app_password)
+        logger.info("Logged in to Bluesky")
+        phase = "image upload"
         embed = _build_image_embed(client, Path(image_path), image_alt) if image_path else None
+        phase = "post creation"
+        logger.info("Sending Bluesky post text_length=%s has_image=%s", len(text), embed is not None)
         response = client.send_post(text, embed=embed) if embed else client.send_post(text)
+        logger.info(
+            "Sent Bluesky post uri=%s cid=%s",
+            str(getattr(response, "uri", "")),
+            str(getattr(response, "cid", "")),
+        )
     except AtProtocolError as e:
-        raise RuntimeError(f"Failed to post to Bluesky: {type(e).__name__}") from None
+        logger.warning("Failed to post to Bluesky during %s after %s.", phase, type(e).__name__)
+        raise RuntimeError(f"Failed to post to Bluesky during {phase}: {type(e).__name__}") from None
 
     return BlueskyPostResult(
         uri=str(getattr(response, "uri", "")),
@@ -82,12 +96,15 @@ def post_to_bluesky(
 
 def _build_image_embed(client: Client, image_path: Path, image_alt: str) -> models.AppBskyEmbedImages.Main:
     image_bytes = image_path.read_bytes()
+    logger.info("Preparing Bluesky image %s size=%s bytes", image_path, len(image_bytes))
     if len(image_bytes) > MAX_IMAGE_BYTES:
         raise ValueError(f"Bluesky image must be {MAX_IMAGE_BYTES} bytes or fewer")
     with Image.open(image_path) as source_image:
         width, height = source_image.size
 
+    logger.info("Uploading Bluesky image %s width=%s height=%s", image_path, width, height)
     blob = client.upload_blob(image_bytes).blob
+    logger.info("Uploaded Bluesky image %s", image_path)
     image = models.AppBskyEmbedImages.Image(
         alt=image_alt,
         image=blob,
