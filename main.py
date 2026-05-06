@@ -42,53 +42,38 @@ logger = logging.getLogger(__name__)
 HF_REPO_ID = os.environ.get("HF_REPO_ID", "")
 GCS_BUCKET = os.environ.get("GCS_BUCKET", "")
 
+_MAX_PAPERS = 20
+_SEARCH_DAYS = 2
+_REPORT_LIMIT = 30
+_KNOWN_ID_HOURS = 24
+_REPORT_DPI = 100
 
-def main():
-    if GCS_BUCKET:
-        logger.info("Restoring persistent data from GCS")
-        restore_dir(GCS_BUCKET, "persistent_data.tar.gz", "./persistent_data")
-        logger.info("Restored persistent data from GCS")
 
-    logger.info("Searching alphaXiv papers")
-    ax_papers = search_alphaxiv(max_papers=20, interval="30+Days", wait=1)
-    logger.info("Fetched %s papers", len(ax_papers))
+def _search_and_upload(source, search_fn, search_kwargs, upload_path):
+    logger.info("Searching %s papers", source)
+    papers = search_fn(**search_kwargs)
+    logger.info("Fetched %s papers", len(papers))
     if HF_REPO_ID:
-        logger.info("Uploading alphaXiv papers to Hugging Face Dataset")
-        upload_papers(ax_papers, HF_REPO_ID, "raw/alphaxiv.jsonl")
-        logger.info("Uploaded alphaXiv papers to Hugging Face Dataset")
+        logger.info("Uploading %s papers to Hugging Face Dataset", source)
+        upload_papers(papers, HF_REPO_ID, upload_path)
+        logger.info("Uploaded %s papers to Hugging Face Dataset", source)
+    return papers
 
-    logger.info("Searching Hugging Face papers")
-    hf_papers = search_huggingface(max_papers=20, days=2, wait=1)
-    logger.info("Fetched %s papers", len(hf_papers))
-    if HF_REPO_ID:
-        logger.info("Uploading Hugging Face papers to Hugging Face Dataset")
-        upload_papers(hf_papers, HF_REPO_ID, "raw/huggingface.jsonl")
-        logger.info("Uploaded Hugging Face papers to Hugging Face Dataset")
 
-    ax_stats = [extract_alphaxiv_stats(p) for p in ax_papers]
-    hf_stats = [extract_huggingface_stats(p) for p in hf_papers]
+def _try_post_to_bluesky(label, text, **kwargs):
+    try:
+        post_result = post_to_bluesky(text, **kwargs)
+    except Exception as e:
+        logger.warning("Skipping Bluesky %s after %s.", label, type(e).__name__)
+    else:
+        logger.info("Posted Bluesky %s: uri=%s cid=%s", label, post_result.uri, post_result.cid)
 
-    df_stats = aggregate_stats(ax_stats + hf_stats)
-    valid_arxiv_id_mask = df_stats["arxiv_id"].map(is_arxiv_id)
-    invalid_arxiv_ids = df_stats.loc[~valid_arxiv_id_mask, "arxiv_id"].to_list()
-    if invalid_arxiv_ids:
-        logger.info("Skipping non-arXiv IDs: %s", invalid_arxiv_ids[:10])
-    df_stats = df_stats.loc[valid_arxiv_id_mask].reset_index(drop=True)
 
-    logger.info("stats:\n%s", df_stats.head(50))
-
-    now = datetime.now(UTC)
-    logger.info("Loading ranking history")
-    history = load_ranking_history(now)
-    known_ids = {aid for aid, first_seen in history.items() if now - first_seen >= timedelta(hours=24)}
-
-    logger.info("Building report rows")
-    report_rows = build_report_rows(df_stats, ax_papers, hf_papers, limit=30, known_arxiv_ids=known_ids)
-
-    logger.info("Updating ranking history")
-    update_ranking_history(history, [row.arxiv_id for row in report_rows], now)
-
-    for row in [row for row in report_rows if row.is_new]:
+def _post_new_papers(report_rows):
+    bluesky_handle = os.environ.get("BLUESKY_HANDLE", "")
+    for row in report_rows:
+        if not row.is_new:
+            continue
         try:
             logger.info("Capturing arXiv first page for %s", row.arxiv_id)
             image_path = capture_arxiv_first_page(
@@ -98,26 +83,16 @@ def main():
             )
         except Exception:
             logger.exception("Failed to capture first page for %s", row.arxiv_id)
-        else:
-            title = getattr(row, "title", "") or row.arxiv_id
-            image_alt = f"First page of arXiv:{row.arxiv_id}: {title}"
-            logger.info("Captured arXiv first page for %s", row.arxiv_id)
-            if os.environ.get("BLUESKY_HANDLE", ""):
-                post_text = build_bluesky_paper_post(row)
-                try:
-                    logger.info("Posting Bluesky update for %s", row.arxiv_id)
-                    # post_to_bluesky reads BLUESKY_HANDLE, BLUESKY_APP_PASSWORD, and BLUESKY_SERVICE_URL internally.
-                    post_result = post_to_bluesky(post_text, image_path=image_path, image_alt=image_alt)
-                except Exception as e:
-                    logger.warning("Skipping Bluesky post for %s after %s.", row.arxiv_id, type(e).__name__)
-                else:
-                    logger.info(
-                        "Posted Bluesky update for %s: uri=%s cid=%s",
-                        row.arxiv_id,
-                        post_result.uri,
-                        post_result.cid,
-                    )
+            continue
+        title = getattr(row, "title", "") or row.arxiv_id
+        image_alt = f"First page of arXiv:{row.arxiv_id}: {title}"
+        logger.info("Captured arXiv first page for %s", row.arxiv_id)
+        if bluesky_handle:
+            post_text = build_bluesky_paper_post(row)
+            _try_post_to_bluesky(f"post for {row.arxiv_id}", post_text, image_path=image_path, image_alt=image_alt)
 
+
+def _post_report(report_rows):
     logger.info("Rendering report HTML")
     report_html_path = render_report_html(report_rows, "reports/top30.html")
     logger.info("Rendering report PDF")
@@ -126,26 +101,61 @@ def main():
     report_png_path = convert_pdf_to_png(
         report_pdf_path,
         "reports/top30.png",
-        100,
+        _REPORT_DPI,
         MAX_IMAGE_BYTES,
     )
     logger.info("Saved top 30 report to %s", report_png_path)
-
     if os.environ.get("BLUESKY_HANDLE", ""):
         report_post_text = build_bluesky_report_post(report_rows)
-        try:
-            logger.info("Posting Bluesky top 30 report")
-            # post_to_bluesky reads BLUESKY_HANDLE, BLUESKY_APP_PASSWORD, and BLUESKY_SERVICE_URL internally.
-            post_result = post_to_bluesky(
-                report_post_text,
-                image_path=report_png_path,
-                image_alt="arXiv Upvote Trends top 30 report",
-                timeout=60,
-            )
-        except Exception as e:
-            logger.warning("Skipping Bluesky top 30 report after %s.", type(e).__name__)
-        else:
-            logger.info("Posted Bluesky top 30 report: uri=%s cid=%s", post_result.uri, post_result.cid)
+        _try_post_to_bluesky(
+            "top 30 report",
+            report_post_text,
+            image_path=report_png_path,
+            image_alt="arXiv Upvote Trends top 30 report",
+            timeout=60,
+        )
+
+
+def main():
+    if GCS_BUCKET:
+        logger.info("Restoring persistent data from GCS")
+        restore_dir(GCS_BUCKET, "persistent_data.tar.gz", "./persistent_data")
+        logger.info("Restored persistent data from GCS")
+
+    ax_papers = _search_and_upload(
+        "alphaXiv",
+        search_alphaxiv,
+        {"max_papers": _MAX_PAPERS, "interval": "30+Days", "wait": 1},
+        "raw/alphaxiv.jsonl",
+    )
+    hf_papers = _search_and_upload(
+        "Hugging Face",
+        search_huggingface,
+        {"max_papers": _MAX_PAPERS, "days": _SEARCH_DAYS, "wait": 1},
+        "raw/huggingface.jsonl",
+    )
+
+    ax_stats = [extract_alphaxiv_stats(p) for p in ax_papers]
+    hf_stats = [extract_huggingface_stats(p) for p in hf_papers]
+    df_stats = aggregate_stats(ax_stats + hf_stats)
+    valid_arxiv_id_mask = df_stats["arxiv_id"].map(is_arxiv_id)
+    invalid_arxiv_ids = df_stats.loc[~valid_arxiv_id_mask, "arxiv_id"].to_list()
+    if invalid_arxiv_ids:
+        logger.info("Skipping non-arXiv IDs: %s", invalid_arxiv_ids[:10])
+    df_stats = df_stats.loc[valid_arxiv_id_mask].reset_index(drop=True)
+    logger.info("stats:\n%s", df_stats.head(50))
+
+    now = datetime.now(UTC)
+    logger.info("Loading ranking history")
+    history = load_ranking_history(now)
+    known_ids = {aid for aid, first_seen in history.items() if now - first_seen >= timedelta(hours=_KNOWN_ID_HOURS)}
+    logger.info("Building report rows")
+    report_rows = build_report_rows(df_stats, ax_papers, hf_papers, limit=_REPORT_LIMIT, known_arxiv_ids=known_ids)
+    logger.info("Updating ranking history")
+    update_ranking_history(history, [row.arxiv_id for row in report_rows], now)
+
+    _post_new_papers(report_rows)
+    _post_report(report_rows)
 
     if GCS_BUCKET:
         logger.info("Saving persistent data to GCS")
