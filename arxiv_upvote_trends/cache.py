@@ -3,15 +3,26 @@
 
 import functools
 import logging
+from collections.abc import Callable
+from typing import ParamSpec, Protocol, TypeVar, cast
 
 import joblib
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_CACHE_DIR = "./persistent_data"
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
-def fallback_cache(cache_dir: str = _DEFAULT_CACHE_DIR):
+class _WrappedCallable(Protocol[P, R]):
+    @property
+    def __wrapped__(self) -> Callable[P, R]: ...
+
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
+
+
+def fallback_cache(cache_dir: str = _DEFAULT_CACHE_DIR) -> Callable[[Callable[P, R]], _WrappedCallable[P, R]]:
     """Return a decorator that falls back to cached results after wrapped-function failures.
 
     Each call attempts to execute the function and update the cache on success.
@@ -19,11 +30,12 @@ def fallback_cache(cache_dir: str = _DEFAULT_CACHE_DIR):
     """
     memory = joblib.Memory(cache_dir, verbose=0)
 
-    def decorator(func):
+    def decorator(func: Callable[P, R]) -> _WrappedCallable[P, R]:
+        func_name = getattr(func, "__name__", type(func).__name__)
         cached_func = memory.cache(func)
 
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             # Call check_call_in_cache upfront to initialize joblib's func_code file,
             # ensuring fallback detection works correctly after an exception.
             has_cache = cached_func.check_call_in_cache(*args, **kwargs)  # type: ignore[attr-defined]
@@ -32,10 +44,10 @@ def fallback_cache(cache_dir: str = _DEFAULT_CACHE_DIR):
                 return output
             except Exception as e:
                 if has_cache:
-                    logger.warning("%s raised %s. Using cached result.", func.__name__, type(e).__name__)
+                    logger.warning("%s raised %s. Using cached result.", func_name, type(e).__name__)
                     return cached_func(*args, **kwargs)
-                raise RuntimeError(f"{func.__name__} raised an exception and no cache is available") from e
+                raise RuntimeError(f"{func_name} raised an exception and no cache is available") from e
 
-        return wrapper
+        return cast("_WrappedCallable[P, R]", wrapper)
 
     return decorator
