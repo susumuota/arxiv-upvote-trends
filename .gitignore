@@ -12,6 +12,6 @@ wheels/
 .venv/
 .vscode/
 
-fallback_cache/
+persistent_data/
 misc/
 reports/

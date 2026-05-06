@@ -8,7 +8,7 @@ import joblib
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_CACHE_DIR = "./fallback_cache"
+_DEFAULT_CACHE_DIR = "./persistent_data"
 
 
 def fallback_cache(cache_dir: str = _DEFAULT_CACHE_DIR):

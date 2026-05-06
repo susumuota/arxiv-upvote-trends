@@ -8,7 +8,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_PATH = "./fallback_cache/ranking_history.json"
+_DEFAULT_PATH = "./persistent_data/ranking_history.json"
 
 
 def load_ranking_history(

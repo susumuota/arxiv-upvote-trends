@@ -8,7 +8,7 @@
 ## Runtime Environment
 
 - Production: Google Cloud Run Jobs + Docker. Targets Linux only
-- fallback_cache persistence: stored as tar.gz in a GCS bucket. Restored on job startup and uploaded on shutdown
+- persistent_data persistence: stored as tar.gz in a GCS bucket. Restored on job startup and uploaded on shutdown
 
 ## Testing
 

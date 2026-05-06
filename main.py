@@ -43,9 +43,9 @@ GCS_BUCKET = os.environ.get("GCS_BUCKET", "")
 
 def main():
     if GCS_BUCKET:
-        logger.info("Restoring fallback cache from GCS")
-        restore_dir(GCS_BUCKET, "fallback_cache.tar.gz", "./fallback_cache")
-        logger.info("Restored fallback cache from GCS")
+        logger.info("Restoring persistent data from GCS")
+        restore_dir(GCS_BUCKET, "persistent_data.tar.gz", "./persistent_data")
+        logger.info("Restored persistent data from GCS")
 
     logger.info("Searching alphaXiv papers")
     ax_papers = search_alphaxiv(max_papers=20, interval="30+Days", wait=1)
@@ -114,9 +114,9 @@ def main():
             logger.info("Captured arXiv first page for %s", arxiv_id)
 
     if GCS_BUCKET:
-        logger.info("Saving fallback cache to GCS")
-        save_dir(GCS_BUCKET, "fallback_cache.tar.gz", "./fallback_cache")
-        logger.info("Saved fallback cache to GCS")
+        logger.info("Saving persistent data to GCS")
+        save_dir(GCS_BUCKET, "persistent_data.tar.gz", "./persistent_data")
+        logger.info("Saved persistent data to GCS")
 
 
 if __name__ == "__main__":

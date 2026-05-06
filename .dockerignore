@@ -19,7 +19,7 @@ wheels/
 
 Dockerfile
 LICENSE
-fallback_cache/
+persistent_data/
 misc/
 tests/
 *.md

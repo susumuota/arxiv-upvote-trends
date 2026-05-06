@@ -52,8 +52,8 @@ def test_main_continues_when_bluesky_post_fails(monkeypatch, caplog):
         main_module.main()
 
     post_to_bluesky.assert_called_once()
-    restore_dir.assert_called_once_with("cache-bucket", "fallback_cache.tar.gz", "./fallback_cache")
-    save_dir.assert_called_once_with("cache-bucket", "fallback_cache.tar.gz", "./fallback_cache")
+    restore_dir.assert_called_once_with("cache-bucket", "persistent_data.tar.gz", "./persistent_data")
+    save_dir.assert_called_once_with("cache-bucket", "persistent_data.tar.gz", "./persistent_data")
     assert "Skipping Bluesky post after RuntimeError." in caplog.text
 
 

@@ -68,7 +68,7 @@ If `BLUESKY_HANDLE` is empty or unset, the job skips posting.
 
 ### GCS bucket (optional)
 
-Setup steps for using a GCS bucket to persist `fallback_cache`. If not needed, disable it with `unset GCS_BUCKET`.
+Setup steps for using a GCS bucket to persist `persistent_data`. If not needed, disable it with `unset GCS_BUCKET`.
 
 To reuse an existing project, set `GOOGLE_CLOUD_PROJECT` in `.env` to that project ID and skip project creation.
 
