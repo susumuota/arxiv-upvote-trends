@@ -23,7 +23,7 @@ def test_main_skips_bluesky_when_handle_is_empty(monkeypatch):
     post_to_bluesky.assert_not_called()
 
 
-def test_main_posts_to_bluesky_without_passing_config(monkeypatch):
+def test_main_posts_top30_report_to_bluesky_without_new_rows(monkeypatch):
     _set_base_config(monkeypatch)
     monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
     post_to_bluesky = Mock(return_value=Mock(uri="at://did/example", cid="cid-value"))
@@ -32,9 +32,11 @@ def test_main_posts_to_bluesky_without_passing_config(monkeypatch):
 
     main_module.main()
 
-    post_to_bluesky.assert_called_once()
-    assert post_to_bluesky.call_args.args[0].startswith("arXiv Upvote Trends\nNo papers found.\nGenerated ")
-    assert post_to_bluesky.call_args.kwargs == {}
+    post_to_bluesky.assert_called_once_with(
+        "arXiv Upvote Trends Top 30\nNo papers found.",
+        image_path=Path("reports/top30.png"),
+        image_alt="arXiv Upvote Trends top 30 report",
+    )
 
 
 def test_main_continues_when_bluesky_post_fails(monkeypatch, caplog):
@@ -47,15 +49,65 @@ def test_main_continues_when_bluesky_post_fails(monkeypatch, caplog):
     monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
     monkeypatch.setattr(main_module, "restore_dir", restore_dir)
     monkeypatch.setattr(main_module, "save_dir", save_dir)
-    _stub_pipeline(monkeypatch)
+    mocks = _stub_pipeline(monkeypatch)
+    mocks["build_report_rows"].return_value = [_report_row("2604.00001", is_new=True)]
+    mocks["capture_arxiv_first_page"].return_value = "reports/2604.00001.png"
 
     with caplog.at_level(logging.WARNING):
         main_module.main()
 
-    post_to_bluesky.assert_called_once()
+    assert post_to_bluesky.call_count == 2
     restore_dir.assert_called_once_with("cache-bucket", "persistent_data.tar.gz", "./persistent_data")
     save_dir.assert_called_once_with("cache-bucket", "persistent_data.tar.gz", "./persistent_data")
-    assert "Skipping Bluesky post after RuntimeError." in caplog.text
+    assert "Skipping Bluesky post for 2604.00001 after RuntimeError." in caplog.text
+    assert "Skipping Bluesky top 30 report after RuntimeError." in caplog.text
+
+
+def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
+    _set_base_config(monkeypatch)
+    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    post_to_bluesky = Mock(return_value=Mock(uri="at://did/example", cid="cid-value"))
+    monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
+    report_rows = [
+        _report_row("2604.00001", is_new=False, rank=1),
+        _report_row("2604.00002", is_new=True, rank=2),
+        _report_row("2604.00003", is_new=True, rank=3),
+    ]
+    mocks = _stub_pipeline(monkeypatch)
+    mocks["build_report_rows"].return_value = report_rows
+    mocks["capture_arxiv_first_page"].side_effect = [
+        "reports/2604.00002.png",
+        "reports/2604.00003.png",
+    ]
+
+    main_module.main()
+
+    assert mocks["capture_arxiv_first_page"].call_args_list == [
+        call("2604.00002", "reports/2604.00002.png", max_output_bytes=main_module.MAX_IMAGE_BYTES),
+        call("2604.00003", "reports/2604.00003.png", max_output_bytes=main_module.MAX_IMAGE_BYTES),
+    ]
+    assert post_to_bluesky.call_count == 3
+    assert post_to_bluesky.call_args_list[0].kwargs == {
+        "image_path": "reports/2604.00002.png",
+        "image_alt": "First page of arXiv:2604.00002: Paper 2",
+    }
+    assert post_to_bluesky.call_args_list[1].kwargs == {
+        "image_path": "reports/2604.00003.png",
+        "image_alt": "First page of arXiv:2604.00003: Paper 3",
+    }
+    assert [call_args.args[0] for call_args in post_to_bluesky.call_args_list] == [
+        "New arXiv Upvote Trends paper\nRank 2: Paper 2\n10 pts\nhttps://arxiv.org/abs/2604.00002",
+        "New arXiv Upvote Trends paper\nRank 3: Paper 3\n10 pts\nhttps://arxiv.org/abs/2604.00003",
+        (
+            "arXiv Upvote Trends Top 30\n"
+            "3 papers · total upvotes 30 · comments 0\n"
+            "Top paper: https://arxiv.org/abs/2604.00001"
+        ),
+    ]
+    assert post_to_bluesky.call_args_list[2].kwargs == {
+        "image_path": Path("reports/top30.png"),
+        "image_alt": "arXiv Upvote Trends top 30 report",
+    }
 
 
 def test_main_filters_non_arxiv_ids_before_reporting(monkeypatch):
@@ -74,7 +126,11 @@ def test_main_filters_non_arxiv_ids_before_reporting(monkeypatch):
 
     filtered_stats = mocks["build_report_rows"].call_args.args[0]
     assert filtered_stats["arxiv_id"].to_list() == ["2604.00001"]
-    mocks["capture_arxiv_first_page"].assert_called_once_with("2604.00001", "reports/2604.00001.png")
+    mocks["capture_arxiv_first_page"].assert_called_once_with(
+        "2604.00001",
+        "reports/2604.00001.png",
+        max_output_bytes=main_module.MAX_IMAGE_BYTES,
+    )
 
 
 def test_main_captures_first_pages_only_for_new_report_rows(monkeypatch):
@@ -98,8 +154,8 @@ def test_main_captures_first_pages_only_for_new_report_rows(monkeypatch):
     main_module.main()
 
     assert mocks["capture_arxiv_first_page"].call_args_list == [
-        call("2604.00002", "reports/2604.00002.png"),
-        call("2604.00003", "reports/2604.00003.png"),
+        call("2604.00002", "reports/2604.00002.png", max_output_bytes=main_module.MAX_IMAGE_BYTES),
+        call("2604.00003", "reports/2604.00003.png", max_output_bytes=main_module.MAX_IMAGE_BYTES),
     ]
 
 
@@ -138,5 +194,13 @@ def _empty_stats() -> pd.DataFrame:
     return pd.DataFrame(columns=["arxiv_id", "score", "num_comments", "count", "url"])
 
 
-def _report_row(arxiv_id: str, is_new: bool) -> SimpleNamespace:
-    return SimpleNamespace(arxiv_id=arxiv_id, is_new=is_new)
+def _report_row(arxiv_id: str, is_new: bool, rank: int = 1) -> SimpleNamespace:
+    return SimpleNamespace(
+        rank=rank,
+        arxiv_id=arxiv_id,
+        title=f"Paper {rank}",
+        score=10,
+        num_comments=0,
+        arxiv_url=f"https://arxiv.org/abs/{arxiv_id}",
+        is_new=is_new,
+    )

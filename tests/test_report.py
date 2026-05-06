@@ -333,3 +333,19 @@ def test_convert_pdf_to_png_combines_multiple_pages(tmp_path):
     assert result == output_path
     with Image.open(output_path) as image:
         assert image.size == (20, 22)
+
+
+def test_convert_pdf_to_png_retries_with_lower_dpi_when_too_large(tmp_path):
+    output_path = tmp_path / "report.png"
+    large_images = [Image.new("RGB", (40, 40), "white")]
+    small_images = [Image.new("RGB", (10, 10), "white")]
+
+    with patch(
+        "arxiv_upvote_trends.report.convert_from_path",
+        side_effect=[large_images, small_images],
+    ) as mock_convert:
+        result = convert_pdf_to_png("report.pdf", output_path, max_output_bytes=90, min_dpi=140)
+
+    assert result == output_path
+    assert [call.kwargs["dpi"] for call in mock_convert.call_args_list] == [160, 140]
+    assert output_path.stat().st_size <= 90

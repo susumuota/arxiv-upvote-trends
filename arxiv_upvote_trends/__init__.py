@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 from .alphaxiv import extract_alphaxiv_stats, search_alphaxiv
-from .bluesky import build_bluesky_post, post_to_bluesky
+from .bluesky import MAX_IMAGE_BYTES, build_bluesky_paper_post, build_bluesky_report_post, post_to_bluesky
 from .cache import fallback_cache
 from .dataset import download_papers, upload_papers
 from .gcs import restore_dir, save_dir
@@ -13,8 +13,10 @@ from .report import build_report_rows, convert_pdf_to_png, render_report_html, r
 from .stats import aggregate_stats, is_arxiv_id
 
 __all__ = [
+    "MAX_IMAGE_BYTES",
     "aggregate_stats",
-    "build_bluesky_post",
+    "build_bluesky_paper_post",
+    "build_bluesky_report_post",
     "build_report_rows",
     "capture_arxiv_first_page",
     "convert_pdf_to_png",

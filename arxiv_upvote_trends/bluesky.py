@@ -2,17 +2,18 @@
 # SPDX-License-Identifier: MIT
 
 import os
-from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from pathlib import Path
 
-from atproto import Client
+from atproto import Client, models
 from atproto.exceptions import AtProtocolError
+from PIL import Image
 
 from .report import ReportRow
 
 DEFAULT_SERVICE_URL = "https://bsky.social"
 MAX_POST_LENGTH = 300
+MAX_IMAGE_BYTES = 1_000_000
 _MIN_TITLE_LENGTH = 12
 
 
@@ -24,30 +25,35 @@ class BlueskyPostResult:
     cid: str
 
 
-def build_bluesky_post(
-    rows: Sequence[ReportRow],
-    generated_at: datetime | None = None,
-    limit: int = 5,
-) -> str:
-    """Build a Bluesky post from top report rows within the 300-character limit."""
-    generated = generated_at or datetime.now(tz=UTC)
-    generated_text = generated.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
-    selected_rows = list(rows[:limit])
-
-    if not selected_rows:
-        return _fit_post(f"arXiv Upvote Trends\nNo papers found.\nGenerated {generated_text}")
-
-    for row_count in range(len(selected_rows), 0, -1):
-        visible_rows = selected_rows[:row_count]
-        for title_length in range(48, _MIN_TITLE_LENGTH - 1, -4):
-            text = _format_post(visible_rows, generated_text, title_length)
-            if len(text) <= MAX_POST_LENGTH:
-                return text
-
-    return _fit_post(_format_post(selected_rows[:1], generated_text, _MIN_TITLE_LENGTH))
+def build_bluesky_paper_post(row: ReportRow) -> str:
+    """Build one Bluesky post for a newly ranked paper."""
+    for title_length in range(180, _MIN_TITLE_LENGTH - 1, -8):
+        text = _format_paper_post(row, title_length)
+        if len(text) <= MAX_POST_LENGTH:
+            return text
+    return _fit_post(_format_paper_post(row, _MIN_TITLE_LENGTH))
 
 
-def post_to_bluesky(text: str) -> BlueskyPostResult:
+def build_bluesky_report_post(rows: list[ReportRow]) -> str:
+    """Build one Bluesky post for the top report image."""
+    if not rows:
+        return "arXiv Upvote Trends Top 30\nNo papers found."
+
+    total_score = sum(row.score for row in rows)
+    total_comments = sum(row.num_comments for row in rows)
+    parts = [
+        "arXiv Upvote Trends Top 30",
+        f"{len(rows):,} papers · total upvotes {total_score:,} · comments {total_comments:,}",
+        f"Top paper: {rows[0].arxiv_url}",
+    ]
+    return _fit_post("\n".join(parts))
+
+
+def post_to_bluesky(
+    text: str,
+    image_path: str | Path | None = None,
+    image_alt: str = "",
+) -> BlueskyPostResult:
     """Post text to Bluesky using an app password."""
     handle = os.environ.get("BLUESKY_HANDLE", "")
     app_password = os.environ.get("BLUESKY_APP_PASSWORD", "")
@@ -63,7 +69,8 @@ def post_to_bluesky(text: str) -> BlueskyPostResult:
     try:
         client = Client(base_url=service_url)
         client.login(login=handle, password=app_password)
-        response = client.send_post(text)
+        embed = _build_image_embed(client, Path(image_path), image_alt) if image_path else None
+        response = client.send_post(text, embed=embed) if embed else client.send_post(text)
     except AtProtocolError as e:
         raise RuntimeError(f"Failed to post to Bluesky: {type(e).__name__}") from None
 
@@ -73,13 +80,30 @@ def post_to_bluesky(text: str) -> BlueskyPostResult:
     )
 
 
-def _format_post(rows: Sequence[ReportRow], generated_text: str, title_length: int) -> str:
-    header = f"arXiv Upvote Trends Top {len(rows)}"
-    paper_lines = [
-        f"{row.rank}. {_truncate(row.title or row.arxiv_id, title_length)} ({row.score:,} pts)" for row in rows
+def _build_image_embed(client: Client, image_path: Path, image_alt: str) -> models.AppBskyEmbedImages.Main:
+    image_bytes = image_path.read_bytes()
+    if len(image_bytes) > MAX_IMAGE_BYTES:
+        raise ValueError(f"Bluesky image must be {MAX_IMAGE_BYTES} bytes or fewer")
+    with Image.open(image_path) as source_image:
+        width, height = source_image.size
+
+    blob = client.upload_blob(image_bytes).blob
+    image = models.AppBskyEmbedImages.Image(
+        alt=image_alt,
+        image=blob,
+        aspect_ratio=models.AppBskyEmbedDefs.AspectRatio(width=width, height=height),
+    )
+    return models.AppBskyEmbedImages.Main(images=[image])
+
+
+def _format_paper_post(row: ReportRow, title_length: int) -> str:
+    title = _truncate(row.title or row.arxiv_id, title_length)
+    parts = [
+        "New arXiv Upvote Trends paper",
+        f"Rank {row.rank}: {title}",
+        f"{row.score:,} pts",
+        row.arxiv_url,
     ]
-    top_url = f"Top paper: {rows[0].arxiv_url}" if rows else ""
-    parts = [header, *paper_lines, top_url, f"Generated {generated_text}"]
     return "\n".join(part for part in parts if part)
 
 

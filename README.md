@@ -53,7 +53,8 @@ hf repos create $HF_REPO_ID --type dataset --private
 
 ### Bluesky posting (optional)
 
-Setup steps for posting the aggregated top papers to Bluesky. Create an app password in Bluesky settings.
+Setup steps for posting newly ranked papers to Bluesky. Each new ranking entry is posted separately with its
+first-page image when the arXiv PDF capture succeeds. Create an app password in Bluesky settings.
 For local runs, set the posting configuration in `.env`. For Cloud Run Jobs, store the app password in
 Secret Manager and inject it as `BLUESKY_APP_PASSWORD`.
 `post_to_bluesky()` reads `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`, and `BLUESKY_SERVICE_URL` internally.

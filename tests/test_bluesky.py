@@ -1,56 +1,68 @@
 # Copyright (c) 2026 Susumu Ota
 # SPDX-License-Identifier: MIT
 
-from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 from atproto.exceptions import AtProtocolError
+from atproto_client.models.blob_ref import BlobRef
+from PIL import Image
 
-from arxiv_upvote_trends.bluesky import MAX_POST_LENGTH, build_bluesky_post, post_to_bluesky
+from arxiv_upvote_trends.bluesky import (
+    MAX_IMAGE_BYTES,
+    MAX_POST_LENGTH,
+    build_bluesky_paper_post,
+    build_bluesky_report_post,
+    post_to_bluesky,
+)
 from arxiv_upvote_trends.report import ReportRow
 
 
-def test_build_bluesky_post_includes_top_rows_and_url():
+def test_build_bluesky_paper_post_includes_row_details_and_url():
+    row = _row(rank=2, arxiv_id="2604.00002", title="Second paper", score=45)
+
+    text = build_bluesky_paper_post(row)
+
+    assert len(text) <= MAX_POST_LENGTH
+    assert "New arXiv Upvote Trends paper" in text
+    assert "Rank 2: Second paper" in text
+    assert "45 pts" in text
+    assert "https://arxiv.org/abs/2604.00002" in text
+
+
+def test_build_bluesky_paper_post_truncates_long_titles():
+    row = _row(
+        rank=1,
+        arxiv_id="2604.00001",
+        title="A very long paper title that should be shortened before posting to Bluesky " * 20,
+        score=123,
+    )
+
+    text = build_bluesky_paper_post(row)
+
+    assert len(text) <= MAX_POST_LENGTH
+    assert "..." in text
+    assert "https://arxiv.org/abs/2604.00001" in text
+
+
+def test_build_bluesky_report_post_includes_report_summary():
     rows = [
         _row(rank=1, arxiv_id="2604.00001", title="First paper", score=123),
         _row(rank=2, arxiv_id="2604.00002", title="Second paper", score=45),
     ]
 
-    text = build_bluesky_post(rows, generated_at=datetime(2026, 4, 23, 0, 0, tzinfo=UTC), limit=5)
+    text = build_bluesky_report_post(rows)
 
     assert len(text) <= MAX_POST_LENGTH
-    assert "arXiv Upvote Trends Top 2" in text
-    assert "1. First paper (123 pts)" in text
-    assert "2. Second paper (45 pts)" in text
-    assert "Top paper: https://arxiv.org/abs/2604.00001" in text
-    assert "Generated 2026-04-23 00:00 UTC" in text
-
-
-def test_build_bluesky_post_truncates_long_titles():
-    rows = [
-        _row(
-            rank=index,
-            arxiv_id=f"2604.{index:05}",
-            title="A very long paper title that should be shortened before posting to Bluesky",
-            score=1000 - index,
-        )
-        for index in range(1, 6)
-    ]
-
-    text = build_bluesky_post(rows, generated_at=datetime(2026, 4, 23, 0, 0, tzinfo=UTC), limit=5)
-
-    assert len(text) <= MAX_POST_LENGTH
-    assert "..." in text
+    assert "arXiv Upvote Trends Top 30" in text
+    assert "2 papers" in text
+    assert "total upvotes 168" in text
     assert "Top paper: https://arxiv.org/abs/2604.00001" in text
 
 
-def test_build_bluesky_post_handles_empty_rows():
-    text = build_bluesky_post([], generated_at=datetime(2026, 4, 23, 0, 0, tzinfo=UTC))
-
-    assert len(text) <= MAX_POST_LENGTH
-    assert text == "arXiv Upvote Trends\nNo papers found.\nGenerated 2026-04-23 00:00 UTC"
+def test_build_bluesky_report_post_handles_empty_rows():
+    assert build_bluesky_report_post([]) == "arXiv Upvote Trends Top 30\nNo papers found."
 
 
 @patch("arxiv_upvote_trends.bluesky.Client")
@@ -80,6 +92,70 @@ def test_post_to_bluesky_uses_configured_service_url(mock_client_cls, monkeypatc
     post_to_bluesky("hello")
 
     mock_client_cls.assert_called_once_with(base_url="https://example.test")
+
+
+@patch("arxiv_upvote_trends.bluesky.Client")
+def test_post_to_bluesky_attaches_images(mock_client_cls, monkeypatch, tmp_path):
+    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    monkeypatch.setenv("BLUESKY_APP_PASSWORD", "app-password")
+    image_path = tmp_path / "2604.00001.png"
+    Image.new("RGB", (20, 10), "white").save(image_path)
+    mock_client = mock_client_cls.return_value
+    mock_client.upload_blob.return_value = SimpleNamespace(blob=BlobRef(mimeType="image/png", size=1, ref="blob-ref"))
+    mock_client.send_post.return_value = SimpleNamespace(uri="at://did/example", cid="cid-value")
+
+    post_to_bluesky("hello", image_path=image_path, image_alt="First page")
+
+    mock_client.upload_blob.assert_called_once_with(image_path.read_bytes())
+    _, kwargs = mock_client.send_post.call_args
+    assert kwargs["embed"].images[0].alt == "First page"
+    assert kwargs["embed"].images[0].aspect_ratio.width == 20
+    assert kwargs["embed"].images[0].aspect_ratio.height == 10
+
+
+@patch("arxiv_upvote_trends.bluesky.Client")
+def test_post_to_bluesky_sends_one_image_per_post(mock_client_cls, monkeypatch, tmp_path):
+    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    monkeypatch.setenv("BLUESKY_APP_PASSWORD", "app-password")
+    image_path = tmp_path / "2604.00001.png"
+    Image.new("RGB", (20, 10), "white").save(image_path)
+    mock_client = mock_client_cls.return_value
+    mock_client.upload_blob.return_value = SimpleNamespace(blob=BlobRef(mimeType="image/png", size=1, ref="blob-ref"))
+    mock_client.send_post.return_value = SimpleNamespace(uri="at://did/example", cid="cid-value")
+
+    post_to_bluesky("hello", image_path=image_path)
+
+    mock_client.upload_blob.assert_called_once()
+    _, kwargs = mock_client.send_post.call_args
+    assert len(kwargs["embed"].images) == 1
+
+
+@patch("arxiv_upvote_trends.bluesky.Client")
+def test_post_to_bluesky_rejects_large_images(mock_client_cls, monkeypatch, tmp_path):
+    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    monkeypatch.setenv("BLUESKY_APP_PASSWORD", "app-password")
+    image_path = tmp_path / "2604.00001.png"
+    image_path.write_bytes(b"x" * (MAX_IMAGE_BYTES + 1))
+    mock_client = mock_client_cls.return_value
+
+    with pytest.raises(ValueError, match="Bluesky image"):
+        post_to_bluesky("hello", image_path=image_path)
+
+    mock_client.upload_blob.assert_not_called()
+    mock_client.send_post.assert_not_called()
+
+
+@patch("arxiv_upvote_trends.bluesky.Client")
+def test_post_to_bluesky_does_not_send_text_only_when_image_fails(mock_client_cls, monkeypatch, tmp_path):
+    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    monkeypatch.setenv("BLUESKY_APP_PASSWORD", "app-password")
+    missing_image_path = tmp_path / "missing.png"
+    mock_client = mock_client_cls.return_value
+
+    with pytest.raises(OSError, match="No such file or directory"):
+        post_to_bluesky("hello", image_path=missing_image_path)
+
+    mock_client.send_post.assert_not_called()
 
 
 def test_post_to_bluesky_requires_credentials(monkeypatch):

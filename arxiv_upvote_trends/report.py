@@ -134,20 +134,47 @@ def render_report_pdf(html_path: str | Path, output_path: str | Path) -> Path:
     return output
 
 
-def convert_pdf_to_png(pdf_path: str | Path, output_path: str | Path, dpi: int = 180) -> Path:
+def convert_pdf_to_png(
+    pdf_path: str | Path,
+    output_path: str | Path,
+    dpi: int = 160,
+    max_output_bytes: int | None = None,
+    min_dpi: int = 80,
+    dpi_step: int = 20,
+) -> Path:
     """Convert a report PDF to a single PNG image.
 
     Multiple pages are stacked vertically before trimming the bottom margin.
     """
+    if min_dpi > dpi:
+        raise ValueError("min_dpi must be less than or equal to dpi")
+    if dpi_step <= 0:
+        raise ValueError("dpi_step must be positive")
+
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
-    images = convert_from_path(pdf_path, dpi=dpi)
-    if not images:
-        raise ValueError(f"No pages found in PDF: {pdf_path}")
+    current_dpi = dpi
+    last_size = 0
+    while True:
+        images = convert_from_path(pdf_path, dpi=current_dpi)
+        if not images:
+            raise ValueError(f"No pages found in PDF: {pdf_path}")
 
+        _save_combined_png(images, output)
+        last_size = output.stat().st_size
+        if max_output_bytes is None or last_size <= max_output_bytes:
+            return output
+        if current_dpi <= min_dpi:
+            break
+        current_dpi = max(min_dpi, current_dpi - dpi_step)
+
+    raise ValueError(f"Report image for {pdf_path} is {last_size} bytes at min_dpi={min_dpi}")
+
+
+def _save_combined_png(images: list[Image.Image], output: Path) -> None:
     if len(images) == 1:
         _trim_bottom_margin(images[0]).save(output, "PNG")
-        return output
+        return
 
     width = max(image.width for image in images)
     height = sum(image.height for image in images)
@@ -158,7 +185,6 @@ def convert_pdf_to_png(pdf_path: str | Path, output_path: str | Path, dpi: int =
         combined.paste(image, (left, offset))
         offset += image.height
     _trim_bottom_margin(combined).save(output, "PNG")
-    return output
 
 
 def _paper_rows_html(rows: list[ReportRow]) -> str:

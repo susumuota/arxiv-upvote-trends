@@ -8,8 +8,10 @@ from datetime import UTC, datetime, timedelta
 from dotenv import load_dotenv
 
 from arxiv_upvote_trends import (
+    MAX_IMAGE_BYTES,
     aggregate_stats,
-    build_bluesky_post,
+    build_bluesky_paper_post,
+    build_bluesky_report_post,
     build_report_rows,
     capture_arxiv_first_page,
     convert_pdf_to_png,
@@ -85,33 +87,63 @@ def main():
 
     logger.info("Updating ranking history")
     update_ranking_history(history, [row.arxiv_id for row in report_rows], now)
+
+    for row in [row for row in report_rows if row.is_new]:
+        try:
+            logger.info("Capturing arXiv first page for %s", row.arxiv_id)
+            image_path = capture_arxiv_first_page(
+                row.arxiv_id,
+                f"reports/{row.arxiv_id}.png",
+                max_output_bytes=MAX_IMAGE_BYTES,
+            )
+        except Exception:
+            logger.exception("Failed to capture first page for %s", row.arxiv_id)
+        else:
+            title = getattr(row, "title", "") or row.arxiv_id
+            image_alt = f"First page of arXiv:{row.arxiv_id}: {title}"
+            logger.info("Captured arXiv first page for %s", row.arxiv_id)
+            if os.environ.get("BLUESKY_HANDLE", ""):
+                post_text = build_bluesky_paper_post(row)
+                try:
+                    logger.info("Posting Bluesky update for %s", row.arxiv_id)
+                    # post_to_bluesky reads BLUESKY_HANDLE, BLUESKY_APP_PASSWORD, and BLUESKY_SERVICE_URL internally.
+                    post_result = post_to_bluesky(post_text, image_path=image_path, image_alt=image_alt)
+                except Exception as e:
+                    logger.warning("Skipping Bluesky post for %s after %s.", row.arxiv_id, type(e).__name__)
+                else:
+                    logger.info(
+                        "Posted Bluesky update for %s: uri=%s cid=%s",
+                        row.arxiv_id,
+                        post_result.uri,
+                        post_result.cid,
+                    )
+
     logger.info("Rendering report HTML")
     report_html_path = render_report_html(report_rows, "reports/top30.html")
     logger.info("Rendering report PDF")
     report_pdf_path = render_report_pdf(report_html_path, "reports/top30.pdf")
     logger.info("Converting report PDF to PNG")
-    report_png_path = convert_pdf_to_png(report_pdf_path, "reports/top30.png", dpi=120)
+    report_png_path = convert_pdf_to_png(
+        report_pdf_path,
+        "reports/top30.png",
+        max_output_bytes=MAX_IMAGE_BYTES,
+    )
     logger.info("Saved top 30 report to %s", report_png_path)
 
     if os.environ.get("BLUESKY_HANDLE", ""):
-        post_text = build_bluesky_post(report_rows, limit=5)
+        report_post_text = build_bluesky_report_post(report_rows)
         try:
-            logger.info("Posting Bluesky update")
+            logger.info("Posting Bluesky top 30 report")
             # post_to_bluesky reads BLUESKY_HANDLE, BLUESKY_APP_PASSWORD, and BLUESKY_SERVICE_URL internally.
-            post_result = post_to_bluesky(post_text)
+            post_result = post_to_bluesky(
+                report_post_text,
+                image_path=report_png_path,
+                image_alt="arXiv Upvote Trends top 30 report",
+            )
         except Exception as e:
-            logger.warning("Skipping Bluesky post after %s.", type(e).__name__)
+            logger.warning("Skipping Bluesky top 30 report after %s.", type(e).__name__)
         else:
-            logger.info("Posted Bluesky update: uri=%s cid=%s", post_result.uri, post_result.cid)
-
-    for row in [row for row in report_rows if row.is_new]:
-        try:
-            logger.info("Capturing arXiv first page for %s", row.arxiv_id)
-            capture_arxiv_first_page(row.arxiv_id, f"reports/{row.arxiv_id}.png")
-        except Exception:
-            logger.exception("Failed to capture first page for %s", row.arxiv_id)
-        else:
-            logger.info("Captured arXiv first page for %s", row.arxiv_id)
+            logger.info("Posted Bluesky top 30 report: uri=%s cid=%s", post_result.uri, post_result.cid)
 
     if GCS_BUCKET:
         logger.info("Saving persistent data to GCS")
