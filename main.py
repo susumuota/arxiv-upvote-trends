@@ -126,7 +126,8 @@ def main():
     report_png_path = convert_pdf_to_png(
         report_pdf_path,
         "reports/top30.png",
-        max_output_bytes=MAX_IMAGE_BYTES,
+        100,
+        MAX_IMAGE_BYTES,
     )
     logger.info("Saved top 30 report to %s", report_png_path)
 
