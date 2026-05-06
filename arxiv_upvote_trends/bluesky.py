@@ -8,11 +8,13 @@ from pathlib import Path
 
 from atproto import Client, models
 from atproto.exceptions import AtProtocolError
+from atproto_client.request import Request
 from PIL import Image
 
 from .report import ReportRow
 
 DEFAULT_SERVICE_URL = "https://bsky.social"
+DEFAULT_TIMEOUT = 30
 MAX_POST_LENGTH = 300
 MAX_IMAGE_BYTES = 1_000_000
 _MIN_TITLE_LENGTH = 12
@@ -55,6 +57,7 @@ def post_to_bluesky(
     text: str,
     image_path: str | Path | None = None,
     image_alt: str = "",
+    timeout: int = DEFAULT_TIMEOUT,
 ) -> BlueskyPostResult:
     """Post text to Bluesky using an app password."""
     handle = os.environ.get("BLUESKY_HANDLE", "")
@@ -70,8 +73,8 @@ def post_to_bluesky(
 
     phase = "login"
     try:
-        client = Client(base_url=service_url)
-        logger.info("Logging in to Bluesky as %s via %s", handle, service_url)
+        client = Client(base_url=service_url, request=Request(timeout=timeout))
+        logger.info("Logging in to Bluesky as %s via %s (timeout=%ss)", handle, service_url, timeout)
         client.login(login=handle, password=app_password)
         logger.info("Logged in to Bluesky")
         phase = "image upload"

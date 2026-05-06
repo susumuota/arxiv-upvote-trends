@@ -140,6 +140,7 @@ def main():
                 report_post_text,
                 image_path=report_png_path,
                 image_alt="arXiv Upvote Trends top 30 report",
+                timeout=60,
             )
         except Exception as e:
             logger.warning("Skipping Bluesky top 30 report after %s.", type(e).__name__)

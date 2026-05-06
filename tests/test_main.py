@@ -36,6 +36,21 @@ def test_main_posts_top30_report_to_bluesky_without_new_rows(monkeypatch):
         "arXiv Upvote Trends Top 30\nNo papers found.",
         image_path=Path("reports/top30.png"),
         image_alt="arXiv Upvote Trends top 30 report",
+        timeout=60,
+    )
+
+
+def test_main_converts_pdf_to_png(monkeypatch):
+    _set_base_config(monkeypatch)
+    mocks = _stub_pipeline(monkeypatch)
+
+    main_module.main()
+
+    mocks["convert_pdf_to_png"].assert_called_once_with(
+        Path("reports/top30.pdf"),
+        "reports/top30.png",
+        100,
+        main_module.MAX_IMAGE_BYTES,
     )
 
 
@@ -86,6 +101,11 @@ def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
         call("2604.00002", "reports/2604.00002.png", max_output_bytes=main_module.MAX_IMAGE_BYTES),
         call("2604.00003", "reports/2604.00003.png", max_output_bytes=main_module.MAX_IMAGE_BYTES),
     ]
+    report_post_text = (
+        "arXiv Upvote Trends Top 30\n"
+        "3 papers · total upvotes 30 · comments 0\n"
+        "Top paper: https://arxiv.org/abs/2604.00001"
+    )
     assert post_to_bluesky.call_count == 3
     assert post_to_bluesky.call_args_list[0].kwargs == {
         "image_path": "reports/2604.00002.png",
@@ -98,15 +118,12 @@ def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
     assert [call_args.args[0] for call_args in post_to_bluesky.call_args_list] == [
         "New arXiv Upvote Trends paper\nRank 2: Paper 2\n10 pts\nhttps://arxiv.org/abs/2604.00002",
         "New arXiv Upvote Trends paper\nRank 3: Paper 3\n10 pts\nhttps://arxiv.org/abs/2604.00003",
-        (
-            "arXiv Upvote Trends Top 30\n"
-            "3 papers · total upvotes 30 · comments 0\n"
-            "Top paper: https://arxiv.org/abs/2604.00001"
-        ),
+        report_post_text,
     ]
     assert post_to_bluesky.call_args_list[2].kwargs == {
         "image_path": Path("reports/top30.png"),
         "image_alt": "arXiv Upvote Trends top 30 report",
+        "timeout": 60,
     }
 
 

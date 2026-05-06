@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
 from atproto.exceptions import AtProtocolError
@@ -10,6 +10,7 @@ from atproto_client.models.blob_ref import BlobRef
 from PIL import Image
 
 from arxiv_upvote_trends.bluesky import (
+    DEFAULT_TIMEOUT,
     MAX_IMAGE_BYTES,
     MAX_POST_LENGTH,
     build_bluesky_paper_post,
@@ -74,7 +75,7 @@ def test_post_to_bluesky_logs_in_and_sends_post(mock_client_cls, monkeypatch):
 
     result = post_to_bluesky("hello")
 
-    mock_client_cls.assert_called_once_with(base_url="https://bsky.social")
+    mock_client_cls.assert_called_once_with(base_url="https://bsky.social", request=ANY)
     mock_client.login.assert_called_once_with(login="user.bsky.social", password="app-password")
     mock_client.send_post.assert_called_once_with("hello")
     assert result.uri == "at://did/example"
@@ -91,7 +92,34 @@ def test_post_to_bluesky_uses_configured_service_url(mock_client_cls, monkeypatc
 
     post_to_bluesky("hello")
 
-    mock_client_cls.assert_called_once_with(base_url="https://example.test")
+    mock_client_cls.assert_called_once_with(base_url="https://example.test", request=ANY)
+
+
+@patch("arxiv_upvote_trends.bluesky.Request")
+@patch("arxiv_upvote_trends.bluesky.Client")
+def test_post_to_bluesky_passes_timeout_to_request(mock_client_cls, mock_request_cls, monkeypatch):
+    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    monkeypatch.setenv("BLUESKY_APP_PASSWORD", "app-password")
+    mock_client = mock_client_cls.return_value
+    mock_client.send_post.return_value = SimpleNamespace(uri="at://did/example", cid="cid-value")
+
+    post_to_bluesky("hello", timeout=60)
+
+    mock_request_cls.assert_called_once_with(timeout=60)
+    mock_client_cls.assert_called_once_with(base_url="https://bsky.social", request=mock_request_cls.return_value)
+
+
+@patch("arxiv_upvote_trends.bluesky.Request")
+@patch("arxiv_upvote_trends.bluesky.Client")
+def test_post_to_bluesky_uses_default_timeout(mock_client_cls, mock_request_cls, monkeypatch):
+    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    monkeypatch.setenv("BLUESKY_APP_PASSWORD", "app-password")
+    mock_client = mock_client_cls.return_value
+    mock_client.send_post.return_value = SimpleNamespace(uri="at://did/example", cid="cid-value")
+
+    post_to_bluesky("hello")
+
+    mock_request_cls.assert_called_once_with(timeout=DEFAULT_TIMEOUT)
 
 
 @patch("arxiv_upvote_trends.bluesky.Client")
