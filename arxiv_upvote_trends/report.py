@@ -95,10 +95,9 @@ def report_html(rows: list[ReportRow], generated_at: datetime | None = None) -> 
     generated_text = generated.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
     total_score = sum(row.score for row in rows)
     total_comments = sum(row.num_comments for row in rows)
-    source_hits = sum(row.count for row in rows)
-
-    total_alphaxiv = sum(row.alphaxiv_score for row in rows)
-    total_huggingface = sum(row.huggingface_score for row in rows)
+    generated_summary = (
+        f"{generated_text} · {len(rows):,} papers · total upvotes {total_score:,} · comments {total_comments:,}"
+    )
 
     return f"""<!doctype html>
 <html lang="en">
@@ -114,18 +113,11 @@ def report_html(rows: list[ReportRow], generated_at: datetime | None = None) -> 
   <header class="report-header">
     <p class="kicker">Live &middot; alphaXiv &times; Hugging Face</p>
     <h1>arXiv Upvote Trends — Top {len(rows)}</h1>
-    <p class="generated">Generated {escape(generated_text)}</p>
-    <dl class="summary">
-      <div><dt>Papers</dt><dd>{len(rows)}</dd></div>
-      <div><dt>Total Score</dt><dd>{total_score:,}</dd></div>
-      <div><dt>alphaXiv</dt><dd>{total_alphaxiv:,}</dd></div>
-      <div><dt>Hugging Face</dt><dd>{total_huggingface:,}</dd></div>
-    </dl>
+    <p class="generated">Generated {escape(generated_summary)}</p>
   </header>
   <section class="paper-list" aria-label="Top papers">
     {_paper_rows_html(rows)}
   </section>
-  <p class="footer">Total comments {total_comments:,} · Source hits {source_hits:,} · arxiv-upvote-trends</p>
 </main>
 </body>
 </html>
@@ -192,7 +184,7 @@ def _paper_row_html(row: ReportRow, max_score: int) -> str:
         <h2>{escape(row.title)}</h2>
         {authors}
         <div class="meta">
-          <span class="tag">{escape(row.arxiv_id)}</span>
+          {_arxiv_tag_html(row)}
           {_link_tags_html(row)}
           {new_tag}
         </div>
@@ -214,9 +206,12 @@ def _paper_row_html(row: ReportRow, max_score: int) -> str:
     </article>"""
 
 
+def _arxiv_tag_html(row: ReportRow) -> str:
+    return f'<a class="tag link arxiv" href="{escape(row.arxiv_url)}">arXiv:{escape(row.arxiv_id)}</a>'
+
+
 def _link_tags_html(row: ReportRow) -> str:
     links = [
-        ("arXiv", row.arxiv_url, "arxiv"),
         ("alphaXiv", row.alphaxiv_url, "ax"),
         ("Hugging Face", row.huggingface_url, "hf"),
     ]
@@ -386,36 +381,6 @@ h1 {
   font-size: 14px;
 }
 
-.summary {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin: 24px 0 0;
-}
-
-.summary div {
-  padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-}
-
-.summary dt {
-  color: #94a3b8;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.summary dd {
-  margin: 6px 0 0;
-  color: #f8fafc;
-  font-size: 28px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-
 .paper-list {
   display: flex;
   flex-direction: column;
@@ -519,7 +484,7 @@ h2 {
 
 .score-row {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: 72px 1fr;
   gap: 12px;
   align-items: center;
 }
@@ -606,10 +571,4 @@ h2 {
   text-transform: uppercase;
 }
 
-.footer {
-  margin-top: 24px;
-  color: #94a3b8;
-  font-size: 12px;
-  text-align: center;
-}
 """

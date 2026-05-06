@@ -163,6 +163,51 @@ def test_report_html_escapes_paper_fields():
     assert "<script>alert(1)</script>" not in html
 
 
+def test_report_html_summarizes_totals_in_generated_line():
+    rows = [
+        ReportRow(
+            rank=1,
+            arxiv_id="2604.00001",
+            title="First paper",
+            authors="",
+            score=12,
+            num_comments=3,
+            count=2,
+            alphaxiv_score=8,
+            huggingface_score=4,
+            huggingface_comments=0,
+            arxiv_url="https://arxiv.org/abs/2604.00001",
+            alphaxiv_url="",
+            huggingface_url="",
+            source_urls=(),
+        ),
+        ReportRow(
+            rank=2,
+            arxiv_id="2604.00002",
+            title="Second paper",
+            authors="",
+            score=5,
+            num_comments=1,
+            count=1,
+            alphaxiv_score=5,
+            huggingface_score=0,
+            huggingface_comments=0,
+            arxiv_url="https://arxiv.org/abs/2604.00002",
+            alphaxiv_url="",
+            huggingface_url="",
+            source_urls=(),
+        ),
+    ]
+
+    html = report_html(rows, generated_at=datetime(2026, 4, 23, 0, 0, tzinfo=UTC))
+
+    assert "Generated 2026-04-23 00:00 UTC · 2 papers · total upvotes 17 · comments 4" in html
+    assert '<dl class="summary">' not in html
+    assert "Total Score" not in html
+    assert '<p class="footer">' not in html
+    assert "Source hits" not in html
+
+
 def test_report_html_marks_new_papers():
     rows = [
         ReportRow(
@@ -207,7 +252,35 @@ def test_report_html_marks_new_papers():
     assert '<span class="tag new">NEW</span>' in html
     assert '<article class="paper top2 new-paper">' not in html
     assert html.count('<span class="tag new">NEW</span>') == 1
-    assert html.index('<span class="tag">2604.00001</span>') < html.index('<span class="tag new">NEW</span>')
+    assert html.index(">arXiv:2604.00001</a>") < html.index('<span class="tag new">NEW</span>')
+
+
+def test_report_html_links_arxiv_id_to_abs_page():
+    rows = [
+        ReportRow(
+            rank=1,
+            arxiv_id="2604.00001",
+            title="Linked paper",
+            authors="",
+            score=2,
+            num_comments=0,
+            count=1,
+            alphaxiv_score=2,
+            huggingface_score=0,
+            huggingface_comments=0,
+            arxiv_url="https://arxiv.org/abs/2604.00001",
+            alphaxiv_url="https://www.alphaxiv.org/abs/2604.00001",
+            huggingface_url="",
+            source_urls=(),
+        )
+    ]
+
+    html = report_html(rows, generated_at=datetime(2026, 4, 23, 0, 0, tzinfo=UTC))
+
+    assert '<a class="tag link arxiv" href="https://arxiv.org/abs/2604.00001">arXiv:2604.00001</a>' in html
+    assert '<span class="tag">2604.00001</span>' not in html
+    assert '<a class="tag link arxiv" href="https://arxiv.org/abs/2604.00001">arXiv</a>' not in html
+    assert '<a class="tag link ax" href="https://www.alphaxiv.org/abs/2604.00001">alphaXiv</a>' in html
 
 
 def test_report_html_places_comments_under_total_score():
