@@ -2,7 +2,7 @@
 
 ## Commands
 
-- Run all tools via `uv run` (e.g. `uv run pytest`, `uv run ruff check .`, `uv run pre-commit run --all-files`)
+- Run all tools via `uv run` (e.g. `uv run ruff check`, `uv run ruff format`, `uv run ty check`, `uv run pytest`, etc.)
 - Add packages with `uv add`
 
 ## Runtime Environment
