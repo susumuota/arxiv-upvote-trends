@@ -91,6 +91,8 @@ def _stub_pipeline(monkeypatch, stats: pd.DataFrame | None = None) -> dict[str, 
     }
     monkeypatch.setattr(main_module, "search_alphaxiv", Mock(return_value=[]))
     monkeypatch.setattr(main_module, "search_huggingface", Mock(return_value=[]))
+    monkeypatch.setattr(main_module, "load_ranking_history", Mock(return_value={}))
+    monkeypatch.setattr(main_module, "update_ranking_history", Mock())
     monkeypatch.setattr(
         main_module,
         "aggregate_stats",

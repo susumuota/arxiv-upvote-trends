@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Susumu Ota
 # SPDX-License-Identifier: MIT
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Set
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from html import escape
@@ -31,6 +31,7 @@ class ReportRow:
     alphaxiv_url: str
     huggingface_url: str
     source_urls: tuple[str, ...]
+    is_new: bool = True
 
 
 def build_report_rows(
@@ -38,6 +39,7 @@ def build_report_rows(
     ax_papers: list[dict],
     hf_papers: list[dict],
     limit: int = 30,
+    known_arxiv_ids: Set[str] = frozenset(),
 ) -> list[ReportRow]:
     """Combine aggregated stats with raw alphaXiv and Hugging Face paper metadata."""
     ax_by_id = _index_papers(ax_papers, ("universal_paper_id", "arxiv_id", "id", "paper_id"))
@@ -68,6 +70,7 @@ def build_report_rows(
                 alphaxiv_url=alphaxiv_url,
                 huggingface_url=huggingface_url,
                 source_urls=source_urls,
+                is_new=arxiv_id not in known_arxiv_ids,
             )
         )
     return rows

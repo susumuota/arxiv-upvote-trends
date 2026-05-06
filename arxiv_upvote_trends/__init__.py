@@ -8,6 +8,7 @@ from .dataset import download_papers, upload_papers
 from .gcs import restore_dir, save_dir
 from .hf import extract_huggingface_stats, search_huggingface
 from .pdf import capture_arxiv_first_page
+from .ranking import load_ranking_history, update_ranking_history
 from .report import build_report_rows, convert_pdf_to_png, render_report_html, render_report_pdf
 from .stats import aggregate_stats, is_arxiv_id
 
@@ -22,6 +23,7 @@ __all__ = [
     "extract_huggingface_stats",
     "fallback_cache",
     "is_arxiv_id",
+    "load_ranking_history",
     "post_to_bluesky",
     "render_report_html",
     "render_report_pdf",
@@ -29,5 +31,6 @@ __all__ = [
     "save_dir",
     "search_alphaxiv",
     "search_huggingface",
+    "update_ranking_history",
     "upload_papers",
 ]

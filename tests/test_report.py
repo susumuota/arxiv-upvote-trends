@@ -114,6 +114,28 @@ def test_build_report_rows_respects_limit():
     assert [row.arxiv_id for row in rows] == ["2604.00000", "2604.00001"]
 
 
+def test_build_report_rows_marks_known_papers_as_not_new():
+    df_stats = pd.DataFrame(
+        [
+            {"arxiv_id": "2604.00001", "score": 10, "num_comments": 0, "count": 1, "url": []},
+            {"arxiv_id": "2604.00002", "score": 5, "num_comments": 0, "count": 1, "url": []},
+        ]
+    )
+
+    rows = build_report_rows(df_stats, [], [], known_arxiv_ids={"2604.00001"})
+
+    assert rows[0].is_new is False
+    assert rows[1].is_new is True
+
+
+def test_build_report_rows_defaults_all_new():
+    df_stats = pd.DataFrame([{"arxiv_id": "2604.00001", "score": 10, "num_comments": 0, "count": 1, "url": []}])
+
+    rows = build_report_rows(df_stats, [], [])
+
+    assert rows[0].is_new is True
+
+
 def test_report_html_escapes_paper_fields():
     rows = [
         ReportRow(

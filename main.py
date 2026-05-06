@@ -3,6 +3,7 @@
 
 import logging
 import os
+from datetime import UTC, datetime, timedelta
 
 from dotenv import load_dotenv
 
@@ -15,6 +16,7 @@ from arxiv_upvote_trends import (
     extract_alphaxiv_stats,
     extract_huggingface_stats,
     is_arxiv_id,
+    load_ranking_history,
     post_to_bluesky,
     render_report_html,
     render_report_pdf,
@@ -22,6 +24,7 @@ from arxiv_upvote_trends import (
     save_dir,
     search_alphaxiv,
     search_huggingface,
+    update_ranking_history,
     upload_papers,
 )
 
@@ -72,8 +75,16 @@ def main():
 
     logger.info("stats:\n%s", df_stats.head(50))
 
+    now = datetime.now(UTC)
+    logger.info("Loading ranking history")
+    history = load_ranking_history(now)
+    known_ids = {aid for aid, first_seen in history.items() if now - first_seen >= timedelta(hours=24)}
+
     logger.info("Building report rows")
-    report_rows = build_report_rows(df_stats, ax_papers, hf_papers, limit=30)
+    report_rows = build_report_rows(df_stats, ax_papers, hf_papers, limit=30, known_arxiv_ids=known_ids)
+
+    logger.info("Updating ranking history")
+    update_ranking_history(history, [row.arxiv_id for row in report_rows], now)
     logger.info("Rendering report HTML")
     report_html_path = render_report_html(report_rows, "reports/top30.html")
     logger.info("Rendering report PDF")
