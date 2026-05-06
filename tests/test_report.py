@@ -210,6 +210,34 @@ def test_report_html_marks_new_papers():
     assert html.index('<span class="tag">2604.00001</span>') < html.index('<span class="tag new">NEW</span>')
 
 
+def test_report_html_places_comments_under_total_score():
+    rows = [
+        ReportRow(
+            rank=1,
+            arxiv_id="2604.00001",
+            title="Commented paper",
+            authors="",
+            score=12,
+            num_comments=3,
+            count=1,
+            alphaxiv_score=8,
+            huggingface_score=4,
+            huggingface_comments=0,
+            arxiv_url="https://arxiv.org/abs/2604.00001",
+            alphaxiv_url="",
+            huggingface_url="",
+            source_urls=(),
+        )
+    ]
+
+    html = report_html(rows, generated_at=datetime(2026, 4, 23, 0, 0, tzinfo=UTC))
+
+    assert (
+        '<div class="score-total">12<small>Total</small><span class="score-comments">3 comments</span></div>' in html
+    )
+    assert '<div class="score-comments">3<small>Comments</small></div>' not in html
+
+
 def test_render_report_html_writes_file(tmp_path):
     output_path = tmp_path / "top30.html"
 

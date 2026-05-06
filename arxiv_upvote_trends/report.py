@@ -181,6 +181,8 @@ def _paper_row_html(row: ReportRow, max_score: int) -> str:
     rank_class = f" top{row.rank}" if row.rank <= 3 else ""
     new_class = " new-paper" if row.is_new else ""
     new_tag = '<span class="tag new">NEW</span>' if row.is_new else ""
+    comment_label = "comment" if row.num_comments == 1 else "comments"
+    comment_tag = f'<span class="score-comments">{row.num_comments:,} {comment_label}</span>'
     return f"""    <article class="paper{rank_class}{new_class}">
       <div class="rank-badge">
         <span class="rank-num">{row.rank:02d}</span>
@@ -196,7 +198,7 @@ def _paper_row_html(row: ReportRow, max_score: int) -> str:
         </div>
       </div>
       <div class="score-row">
-        <div class="score-total">{row.score:,}<small>Total</small></div>
+        <div class="score-total">{row.score:,}<small>Total</small>{comment_tag}</div>
         <div class="bar-col">
           <div class="bar">
             <div class="bar-ax" style="width:{ax_pct:.1f}%"></div>
@@ -208,7 +210,6 @@ def _paper_row_html(row: ReportRow, max_score: int) -> str:
             <span class="cap-hf">HF {row.huggingface_score:,}</span>
           </div>
         </div>
-        <div class="score-comments">{row.num_comments:,}<small>Comments</small></div>
       </div>
     </article>"""
 
@@ -518,7 +519,7 @@ h2 {
 
 .score-row {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   gap: 12px;
   align-items: center;
 }
@@ -562,6 +563,7 @@ h2 {
   line-height: 1;
   font-weight: 800;
   letter-spacing: -0.02em;
+  text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
@@ -594,21 +596,13 @@ h2 {
 }
 
 .score-comments {
-  color: #0f172a;
-  font-size: 14px;
-  line-height: 1;
-  font-weight: 700;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.score-comments small {
   display: block;
-  margin-top: 2px;
-  color: #94a3b8;
-  font-size: 9px;
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1.1;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  font-variant-numeric: tabular-nums;
   text-transform: uppercase;
 }
 
