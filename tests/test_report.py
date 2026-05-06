@@ -163,6 +163,53 @@ def test_report_html_escapes_paper_fields():
     assert "<script>alert(1)</script>" not in html
 
 
+def test_report_html_marks_new_papers():
+    rows = [
+        ReportRow(
+            rank=1,
+            arxiv_id="2604.00001",
+            title="New paper",
+            authors="",
+            score=2,
+            num_comments=0,
+            count=1,
+            alphaxiv_score=2,
+            huggingface_score=0,
+            huggingface_comments=0,
+            arxiv_url="https://arxiv.org/abs/2604.00001",
+            alphaxiv_url="",
+            huggingface_url="",
+            source_urls=(),
+            is_new=True,
+        ),
+        ReportRow(
+            rank=2,
+            arxiv_id="2604.00002",
+            title="Known paper",
+            authors="",
+            score=1,
+            num_comments=0,
+            count=1,
+            alphaxiv_score=1,
+            huggingface_score=0,
+            huggingface_comments=0,
+            arxiv_url="https://arxiv.org/abs/2604.00002",
+            alphaxiv_url="",
+            huggingface_url="",
+            source_urls=(),
+            is_new=False,
+        ),
+    ]
+
+    html = report_html(rows, generated_at=datetime(2026, 4, 23, 0, 0, tzinfo=UTC))
+
+    assert '<article class="paper top1 new-paper">' in html
+    assert '<span class="tag new">NEW</span>' in html
+    assert '<article class="paper top2 new-paper">' not in html
+    assert html.count('<span class="tag new">NEW</span>') == 1
+    assert html.index('<span class="tag">2604.00001</span>') < html.index('<span class="tag new">NEW</span>')
+
+
 def test_render_report_html_writes_file(tmp_path):
     output_path = tmp_path / "top30.html"
 

@@ -179,7 +179,9 @@ def _paper_row_html(row: ReportRow, max_score: int) -> str:
     ax_pct = row.alphaxiv_score / max_score * 100
     hf_pct = row.huggingface_score / max_score * 100
     rank_class = f" top{row.rank}" if row.rank <= 3 else ""
-    return f"""    <article class="paper{rank_class}">
+    new_class = " new-paper" if row.is_new else ""
+    new_tag = '<span class="tag new">NEW</span>' if row.is_new else ""
+    return f"""    <article class="paper{rank_class}{new_class}">
       <div class="rank-badge">
         <span class="rank-num">{row.rank:02d}</span>
         <span class="rank-label">Rank</span>
@@ -190,6 +192,7 @@ def _paper_row_html(row: ReportRow, max_score: int) -> str:
         <div class="meta">
           <span class="tag">{escape(row.arxiv_id)}</span>
           {_link_tags_html(row)}
+          {new_tag}
         </div>
       </div>
       <div class="score-row">
@@ -459,6 +462,12 @@ h1 {
 .paper.top2 .rank-num { color: #64748b; }
 .paper.top3 .rank-num { color: #b45309; }
 
+.paper.new-paper {
+  padding-left: 15px;
+  background: #ffffff;
+  border-left: 5px solid #14b8a6;
+}
+
 .paper-main {
   min-width: 0;
 }
@@ -505,6 +514,7 @@ h2 {
 .tag.link.arxiv { background: #eff6ff; color: #1d4ed8; }
 .tag.link.ax { background: #f5f3ff; color: #6d28d9; }
 .tag.link.hf { background: #fff7e6; color: #92400e; }
+.tag.new { background: #0f766e; color: #ffffff; }
 
 .score-row {
   display: grid;
