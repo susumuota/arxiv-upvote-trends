@@ -91,15 +91,15 @@ def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
     mocks = _stub_pipeline(monkeypatch)
     mocks["build_report_rows"].return_value = report_rows
     mocks["capture_arxiv_first_page"].side_effect = [
-        "reports/2604.00002.png",
         "reports/2604.00003.png",
+        "reports/2604.00002.png",
     ]
 
     main_module.main()
 
     assert mocks["capture_arxiv_first_page"].call_args_list == [
-        call("2604.00002", "reports/2604.00002.png", max_output_bytes=main_module.MAX_IMAGE_BYTES),
         call("2604.00003", "reports/2604.00003.png", max_output_bytes=main_module.MAX_IMAGE_BYTES),
+        call("2604.00002", "reports/2604.00002.png", max_output_bytes=main_module.MAX_IMAGE_BYTES),
     ]
     report_post_text = (
         "arXiv Upvote Trends Top 30\n"
@@ -108,16 +108,16 @@ def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
     )
     assert post_to_bluesky.call_count == 3
     assert post_to_bluesky.call_args_list[0].kwargs == {
-        "image_path": "reports/2604.00002.png",
-        "image_alt": "First page of arXiv:2604.00002: Paper 2",
-    }
-    assert post_to_bluesky.call_args_list[1].kwargs == {
         "image_path": "reports/2604.00003.png",
         "image_alt": "First page of arXiv:2604.00003: Paper 3",
     }
+    assert post_to_bluesky.call_args_list[1].kwargs == {
+        "image_path": "reports/2604.00002.png",
+        "image_alt": "First page of arXiv:2604.00002: Paper 2",
+    }
     assert [call_args.args[0] for call_args in post_to_bluesky.call_args_list] == [
-        "New arXiv Upvote Trends paper\nRank 2: Paper 2\n10 pts\nhttps://arxiv.org/abs/2604.00002",
         "New arXiv Upvote Trends paper\nRank 3: Paper 3\n10 pts\nhttps://arxiv.org/abs/2604.00003",
+        "New arXiv Upvote Trends paper\nRank 2: Paper 2\n10 pts\nhttps://arxiv.org/abs/2604.00002",
         report_post_text,
     ]
     assert post_to_bluesky.call_args_list[2].kwargs == {
@@ -171,8 +171,8 @@ def test_main_captures_first_pages_only_for_new_report_rows(monkeypatch):
     main_module.main()
 
     assert mocks["capture_arxiv_first_page"].call_args_list == [
-        call("2604.00002", "reports/2604.00002.png", max_output_bytes=main_module.MAX_IMAGE_BYTES),
         call("2604.00003", "reports/2604.00003.png", max_output_bytes=main_module.MAX_IMAGE_BYTES),
+        call("2604.00002", "reports/2604.00002.png", max_output_bytes=main_module.MAX_IMAGE_BYTES),
     ]
 
 

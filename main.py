@@ -42,8 +42,8 @@ logger = logging.getLogger(__name__)
 HF_REPO_ID = os.environ.get("HF_REPO_ID", "")
 GCS_BUCKET = os.environ.get("GCS_BUCKET", "")
 
-_MAX_PAPERS = 20
-_SEARCH_DAYS = 2
+_MAX_PAPERS = 1000
+_SEARCH_DAYS = 30
 _REPORT_LIMIT = 30
 _KNOWN_ID_HOURS = 24
 _REPORT_DPI = 100
@@ -71,7 +71,7 @@ def _try_post_to_bluesky(label, text, **kwargs):
 
 def _post_new_papers(report_rows):
     bluesky_handle = os.environ.get("BLUESKY_HANDLE", "")
-    for row in report_rows:
+    for row in reversed(report_rows):
         if not row.is_new:
             continue
         try:
