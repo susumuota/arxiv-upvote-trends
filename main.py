@@ -4,6 +4,7 @@
 import logging
 import os
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -78,7 +79,7 @@ def _post_new_papers(report_rows):
             logger.info("Capturing arXiv first page for %s", row.arxiv_id)
             image_path = capture_arxiv_first_page(
                 row.arxiv_id,
-                f"reports/{row.arxiv_id}.png",
+                Path(f"reports/{row.arxiv_id}.png"),
                 max_output_bytes=MAX_IMAGE_BYTES,
             )
         except Exception:

@@ -9,6 +9,7 @@ from pathlib import Path
 from atproto import Client, models
 from atproto.exceptions import AtProtocolError
 from atproto_client.request import Request
+from atproto_client.utils.text_builder import TextBuilder
 from PIL import Image
 
 from .report import ReportRow
@@ -29,33 +30,34 @@ class BlueskyPostResult:
     cid: str
 
 
-def build_bluesky_paper_post(row: ReportRow) -> str:
+def build_bluesky_paper_post(row: ReportRow) -> TextBuilder:
     """Build one Bluesky post for a newly ranked paper."""
     for title_length in range(180, _MIN_TITLE_LENGTH - 1, -8):
         text = _format_paper_post(row, title_length)
         if len(text) <= MAX_POST_LENGTH:
-            return text
-    return _fit_post(_format_paper_post(row, _MIN_TITLE_LENGTH))
+            return TextBuilder().text(text)
+    return TextBuilder().text(_fit_post(_format_paper_post(row, _MIN_TITLE_LENGTH)))
 
 
-def build_bluesky_report_post(rows: list[ReportRow]) -> str:
+def build_bluesky_report_post(rows: list[ReportRow]) -> TextBuilder:
     """Build one Bluesky post for the top report image."""
+    tb = TextBuilder()
     if not rows:
-        return "arXiv Upvote Trends Top 30\nNo papers found."
+        tb.text("arXiv Upvote Trends Top 30\nNo papers found.")
+        return tb
 
-    total_score = sum(row.score for row in rows)
-    total_comments = sum(row.num_comments for row in rows)
-    parts = [
-        "arXiv Upvote Trends Top 30",
-        f"{len(rows):,} papers · total upvotes {total_score:,} · comments {total_comments:,}",
-        f"Top paper: {rows[0].arxiv_url}",
-    ]
-    return _fit_post("\n".join(parts))
+    total = len(rows)
+    tb.text("arXiv Upvote Trends Top 30\n")
+    for i, row in enumerate(rows):
+        tb.link(f"[{i + 1}/{total}]", row.arxiv_url)
+        if i < total - 1:
+            tb.text(" ")
+    return tb
 
 
 def post_to_bluesky(
-    text: str,
-    image_path: str | Path | None = None,
+    text: TextBuilder,
+    image_path: Path | None = None,
     image_alt: str = "",
     timeout: int = DEFAULT_TIMEOUT,
 ) -> BlueskyPostResult:
@@ -68,7 +70,8 @@ def post_to_bluesky(
         raise ValueError("BLUESKY_HANDLE is required")
     if not app_password:
         raise ValueError("BLUESKY_APP_PASSWORD is required")
-    if len(text) > MAX_POST_LENGTH:
+    plain_text = text.build_text()
+    if len(plain_text) > MAX_POST_LENGTH:
         raise ValueError(f"Bluesky post must be {MAX_POST_LENGTH} characters or fewer")
 
     phase = "login"
@@ -78,9 +81,9 @@ def post_to_bluesky(
         client.login(login=handle, password=app_password)
         logger.info("Logged in to Bluesky")
         phase = "image upload"
-        embed = _build_image_embed(client, Path(image_path), image_alt) if image_path else None
+        embed = _build_image_embed(client, image_path, image_alt) if image_path else None
         phase = "post creation"
-        logger.info("Sending Bluesky post text_length=%s has_image=%s", len(text), embed is not None)
+        logger.info("Sending Bluesky post text_length=%s has_image=%s", len(plain_text), embed is not None)
         response = client.send_post(text, embed=embed) if embed else client.send_post(text)
         logger.info(
             "Sent Bluesky post uri=%s cid=%s",

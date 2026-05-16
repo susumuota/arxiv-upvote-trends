@@ -17,13 +17,13 @@ _USER_AGENT = (
 
 def capture_arxiv_first_page(
     arxiv_id: str,
-    output_path: str,
+    output_path: Path,
     dpi: int = 160,
     timeout: float = 30,
     max_output_bytes: int | None = None,
     min_dpi: int = 80,
     dpi_step: int = 20,
-) -> str:
+) -> Path:
     """Render the first page of an arXiv PDF to a PNG file.
 
     Higher DPI improves text sharpness at the cost of slower conversion and larger output.
@@ -54,7 +54,7 @@ def capture_arxiv_first_page(
                 current_dpi,
                 last_size,
             )
-            return output_path
+            return output
         if current_dpi <= min_dpi:
             break
 

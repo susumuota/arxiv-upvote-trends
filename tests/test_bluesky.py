@@ -5,8 +5,10 @@ from types import SimpleNamespace
 from unittest.mock import ANY, patch
 
 import pytest
+from atproto import models
 from atproto.exceptions import AtProtocolError
 from atproto_client.models.blob_ref import BlobRef
+from atproto_client.utils.text_builder import TextBuilder
 from PIL import Image
 
 from arxiv_upvote_trends.bluesky import (
@@ -23,8 +25,10 @@ from arxiv_upvote_trends.report import ReportRow
 def test_build_bluesky_paper_post_includes_row_details_and_url():
     row = _row(rank=2, arxiv_id="2604.00002", title="Second paper", score=45)
 
-    text = build_bluesky_paper_post(row)
+    result = build_bluesky_paper_post(row)
 
+    assert isinstance(result, TextBuilder)
+    text = result.build_text()
     assert len(text) <= MAX_POST_LENGTH
     assert "New arXiv Upvote Trends paper" in text
     assert "Rank 2: Second paper" in text
@@ -40,30 +44,42 @@ def test_build_bluesky_paper_post_truncates_long_titles():
         score=123,
     )
 
-    text = build_bluesky_paper_post(row)
+    result = build_bluesky_paper_post(row)
 
+    text = result.build_text()
     assert len(text) <= MAX_POST_LENGTH
     assert "..." in text
     assert "https://arxiv.org/abs/2604.00001" in text
 
 
-def test_build_bluesky_report_post_includes_report_summary():
+def test_build_bluesky_report_post_includes_linked_indices():
     rows = [
         _row(rank=1, arxiv_id="2604.00001", title="First paper", score=123),
         _row(rank=2, arxiv_id="2604.00002", title="Second paper", score=45),
     ]
 
-    text = build_bluesky_report_post(rows)
+    result = build_bluesky_report_post(rows)
 
+    assert isinstance(result, TextBuilder)
+    text = result.build_text()
     assert len(text) <= MAX_POST_LENGTH
     assert "arXiv Upvote Trends Top 30" in text
-    assert "2 papers" in text
-    assert "total upvotes 168" in text
-    assert "Top paper: https://arxiv.org/abs/2604.00001" in text
+    assert "[1/2]" in text
+    assert "[2/2]" in text
+    facets = result.build_facets()
+    assert len(facets) == 2
+    link0 = facets[0].features[0]
+    link1 = facets[1].features[0]
+    assert isinstance(link0, models.AppBskyRichtextFacet.Link)
+    assert isinstance(link1, models.AppBskyRichtextFacet.Link)
+    assert link0.uri == "https://arxiv.org/abs/2604.00001"
+    assert link1.uri == "https://arxiv.org/abs/2604.00002"
 
 
 def test_build_bluesky_report_post_handles_empty_rows():
-    assert build_bluesky_report_post([]) == "arXiv Upvote Trends Top 30\nNo papers found."
+    result = build_bluesky_report_post([])
+    assert isinstance(result, TextBuilder)
+    assert result.build_text() == "arXiv Upvote Trends Top 30\nNo papers found."
 
 
 @patch("arxiv_upvote_trends.bluesky.Client")
@@ -73,11 +89,12 @@ def test_post_to_bluesky_logs_in_and_sends_post(mock_client_cls, monkeypatch):
     mock_client = mock_client_cls.return_value
     mock_client.send_post.return_value = SimpleNamespace(uri="at://did/example", cid="cid-value")
 
-    result = post_to_bluesky("hello")
+    result = post_to_bluesky(TextBuilder().text("hello"))
 
     mock_client_cls.assert_called_once_with(base_url="https://bsky.social", request=ANY)
     mock_client.login.assert_called_once_with(login="user.bsky.social", password="app-password")
-    mock_client.send_post.assert_called_once_with("hello")
+    mock_client.send_post.assert_called_once()
+    assert mock_client.send_post.call_args.args[0].build_text() == "hello"
     assert result.uri == "at://did/example"
     assert result.cid == "cid-value"
 
@@ -90,7 +107,7 @@ def test_post_to_bluesky_uses_configured_service_url(mock_client_cls, monkeypatc
     mock_client = mock_client_cls.return_value
     mock_client.send_post.return_value = SimpleNamespace(uri="at://did/example", cid="cid-value")
 
-    post_to_bluesky("hello")
+    post_to_bluesky(TextBuilder().text("hello"))
 
     mock_client_cls.assert_called_once_with(base_url="https://example.test", request=ANY)
 
@@ -103,7 +120,7 @@ def test_post_to_bluesky_passes_timeout_to_request(mock_client_cls, mock_request
     mock_client = mock_client_cls.return_value
     mock_client.send_post.return_value = SimpleNamespace(uri="at://did/example", cid="cid-value")
 
-    post_to_bluesky("hello", timeout=60)
+    post_to_bluesky(TextBuilder().text("hello"), timeout=60)
 
     mock_request_cls.assert_called_once_with(timeout=60)
     mock_client_cls.assert_called_once_with(base_url="https://bsky.social", request=mock_request_cls.return_value)
@@ -117,7 +134,7 @@ def test_post_to_bluesky_uses_default_timeout(mock_client_cls, mock_request_cls,
     mock_client = mock_client_cls.return_value
     mock_client.send_post.return_value = SimpleNamespace(uri="at://did/example", cid="cid-value")
 
-    post_to_bluesky("hello")
+    post_to_bluesky(TextBuilder().text("hello"))
 
     mock_request_cls.assert_called_once_with(timeout=DEFAULT_TIMEOUT)
 
@@ -132,7 +149,7 @@ def test_post_to_bluesky_attaches_images(mock_client_cls, monkeypatch, tmp_path)
     mock_client.upload_blob.return_value = SimpleNamespace(blob=BlobRef(mimeType="image/png", size=1, ref="blob-ref"))
     mock_client.send_post.return_value = SimpleNamespace(uri="at://did/example", cid="cid-value")
 
-    post_to_bluesky("hello", image_path=image_path, image_alt="First page")
+    post_to_bluesky(TextBuilder().text("hello"), image_path=image_path, image_alt="First page")
 
     mock_client.upload_blob.assert_called_once_with(image_path.read_bytes())
     _, kwargs = mock_client.send_post.call_args
@@ -152,7 +169,7 @@ def test_post_to_bluesky_logs_image_upload_and_post_creation(mock_client_cls, mo
     mock_client.send_post.return_value = SimpleNamespace(uri="at://did/example", cid="cid-value")
 
     with caplog.at_level("INFO"):
-        post_to_bluesky("hello", image_path=image_path, image_alt="First page")
+        post_to_bluesky(TextBuilder().text("hello"), image_path=image_path, image_alt="First page")
 
     assert "Logging in to Bluesky as user.bsky.social via https://bsky.social" in caplog.text
     assert f"Preparing Bluesky image {image_path}" in caplog.text
@@ -172,7 +189,7 @@ def test_post_to_bluesky_sends_one_image_per_post(mock_client_cls, monkeypatch, 
     mock_client.upload_blob.return_value = SimpleNamespace(blob=BlobRef(mimeType="image/png", size=1, ref="blob-ref"))
     mock_client.send_post.return_value = SimpleNamespace(uri="at://did/example", cid="cid-value")
 
-    post_to_bluesky("hello", image_path=image_path)
+    post_to_bluesky(TextBuilder().text("hello"), image_path=image_path)
 
     mock_client.upload_blob.assert_called_once()
     _, kwargs = mock_client.send_post.call_args
@@ -188,7 +205,7 @@ def test_post_to_bluesky_rejects_large_images(mock_client_cls, monkeypatch, tmp_
     mock_client = mock_client_cls.return_value
 
     with pytest.raises(ValueError, match="Bluesky image"):
-        post_to_bluesky("hello", image_path=image_path)
+        post_to_bluesky(TextBuilder().text("hello"), image_path=image_path)
 
     mock_client.upload_blob.assert_not_called()
     mock_client.send_post.assert_not_called()
@@ -202,7 +219,7 @@ def test_post_to_bluesky_does_not_send_text_only_when_image_fails(mock_client_cl
     mock_client = mock_client_cls.return_value
 
     with pytest.raises(OSError, match="No such file or directory"):
-        post_to_bluesky("hello", image_path=missing_image_path)
+        post_to_bluesky(TextBuilder().text("hello"), image_path=missing_image_path)
 
     mock_client.send_post.assert_not_called()
 
@@ -211,19 +228,19 @@ def test_post_to_bluesky_requires_credentials(monkeypatch):
     monkeypatch.delenv("BLUESKY_HANDLE", raising=False)
     monkeypatch.setenv("BLUESKY_APP_PASSWORD", "app-password")
     with pytest.raises(ValueError, match="BLUESKY_HANDLE"):
-        post_to_bluesky("hello")
+        post_to_bluesky(TextBuilder().text("hello"))
 
     monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
     monkeypatch.delenv("BLUESKY_APP_PASSWORD", raising=False)
     with pytest.raises(ValueError, match="BLUESKY_APP_PASSWORD"):
-        post_to_bluesky("hello")
+        post_to_bluesky(TextBuilder().text("hello"))
 
 
 def test_post_to_bluesky_rejects_long_text(monkeypatch):
     monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
     monkeypatch.setenv("BLUESKY_APP_PASSWORD", "app-password")
     with pytest.raises(ValueError, match="300"):
-        post_to_bluesky("x" * 301)
+        post_to_bluesky(TextBuilder().text("x" * 301))
 
 
 @patch("arxiv_upvote_trends.bluesky.Client")
@@ -234,7 +251,7 @@ def test_post_to_bluesky_sanitizes_atproto_errors(mock_client_cls, monkeypatch):
     mock_client.login.side_effect = AtProtocolError("request failed with app-password")
 
     with pytest.raises(RuntimeError) as exc_info:
-        post_to_bluesky("hello")
+        post_to_bluesky(TextBuilder().text("hello"))
 
     assert str(exc_info.value) == "Failed to post to Bluesky during login: AtProtocolError"
     assert "app-password" not in str(exc_info.value)
@@ -249,7 +266,7 @@ def test_post_to_bluesky_sanitizes_send_post_errors(mock_client_cls, monkeypatch
     mock_client.send_post.side_effect = AtProtocolError("post failed with app-password")
 
     with pytest.raises(RuntimeError) as exc_info:
-        post_to_bluesky("hello")
+        post_to_bluesky(TextBuilder().text("hello"))
 
     assert str(exc_info.value) == "Failed to post to Bluesky during post creation: AtProtocolError"
     assert "app-password" not in str(exc_info.value)

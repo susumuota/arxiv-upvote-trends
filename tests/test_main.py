@@ -7,6 +7,8 @@ from types import SimpleNamespace
 from unittest.mock import Mock, call
 
 import pandas as pd
+from atproto import models
+from atproto_client.utils.text_builder import TextBuilder
 
 import main as main_module
 
@@ -32,12 +34,15 @@ def test_main_posts_top30_report_to_bluesky_without_new_rows(monkeypatch):
 
     main_module.main()
 
-    post_to_bluesky.assert_called_once_with(
-        "arXiv Upvote Trends Top 30\nNo papers found.",
-        image_path=Path("reports/top30.png"),
-        image_alt="arXiv Upvote Trends top 30 report",
-        timeout=60,
-    )
+    post_to_bluesky.assert_called_once()
+    report_arg = post_to_bluesky.call_args.args[0]
+    assert isinstance(report_arg, TextBuilder)
+    assert report_arg.build_text() == "arXiv Upvote Trends Top 30\nNo papers found."
+    assert post_to_bluesky.call_args.kwargs == {
+        "image_path": Path("reports/top30.png"),
+        "image_alt": "arXiv Upvote Trends top 30 report",
+        "timeout": 60,
+    }
 
 
 def test_main_converts_pdf_to_png(monkeypatch):
@@ -66,7 +71,7 @@ def test_main_continues_when_bluesky_post_fails(monkeypatch, caplog):
     monkeypatch.setattr(main_module, "save_dir", save_dir)
     mocks = _stub_pipeline(monkeypatch)
     mocks["build_report_rows"].return_value = [_report_row("2604.00001", is_new=True)]
-    mocks["capture_arxiv_first_page"].return_value = "reports/2604.00001.png"
+    mocks["capture_arxiv_first_page"].return_value = Path("reports/2604.00001.png")
 
     with caplog.at_level(logging.WARNING):
         main_module.main()
@@ -91,35 +96,41 @@ def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
     mocks = _stub_pipeline(monkeypatch)
     mocks["build_report_rows"].return_value = report_rows
     mocks["capture_arxiv_first_page"].side_effect = [
-        "reports/2604.00003.png",
-        "reports/2604.00002.png",
+        Path("reports/2604.00003.png"),
+        Path("reports/2604.00002.png"),
     ]
 
     main_module.main()
 
     assert mocks["capture_arxiv_first_page"].call_args_list == [
-        call("2604.00003", "reports/2604.00003.png", max_output_bytes=main_module.MAX_IMAGE_BYTES),
-        call("2604.00002", "reports/2604.00002.png", max_output_bytes=main_module.MAX_IMAGE_BYTES),
+        call("2604.00003", Path("reports/2604.00003.png"), max_output_bytes=main_module.MAX_IMAGE_BYTES),
+        call("2604.00002", Path("reports/2604.00002.png"), max_output_bytes=main_module.MAX_IMAGE_BYTES),
     ]
-    report_post_text = (
-        "arXiv Upvote Trends Top 30\n"
-        "3 papers · total upvotes 30 · comments 0\n"
-        "Top paper: https://arxiv.org/abs/2604.00001"
-    )
     assert post_to_bluesky.call_count == 3
+    assert post_to_bluesky.call_args_list[0].args[0].build_text() == (
+        "New arXiv Upvote Trends paper\nRank 3: Paper 3\n10 pts\nhttps://arxiv.org/abs/2604.00003"
+    )
     assert post_to_bluesky.call_args_list[0].kwargs == {
-        "image_path": "reports/2604.00003.png",
+        "image_path": Path("reports/2604.00003.png"),
         "image_alt": "First page of arXiv:2604.00003: Paper 3",
     }
+    assert post_to_bluesky.call_args_list[1].args[0].build_text() == (
+        "New arXiv Upvote Trends paper\nRank 2: Paper 2\n10 pts\nhttps://arxiv.org/abs/2604.00002"
+    )
     assert post_to_bluesky.call_args_list[1].kwargs == {
-        "image_path": "reports/2604.00002.png",
+        "image_path": Path("reports/2604.00002.png"),
         "image_alt": "First page of arXiv:2604.00002: Paper 2",
     }
-    assert [call_args.args[0] for call_args in post_to_bluesky.call_args_list] == [
-        "New arXiv Upvote Trends paper\nRank 3: Paper 3\n10 pts\nhttps://arxiv.org/abs/2604.00003",
-        "New arXiv Upvote Trends paper\nRank 2: Paper 2\n10 pts\nhttps://arxiv.org/abs/2604.00002",
-        report_post_text,
-    ]
+    report_arg = post_to_bluesky.call_args_list[2].args[0]
+    assert isinstance(report_arg, TextBuilder)
+    assert report_arg.build_text() == "arXiv Upvote Trends Top 30\n[1/3] [2/3] [3/3]"
+    facets = report_arg.build_facets()
+    assert len(facets) == 3
+    links = [f.features[0] for f in facets]
+    assert all(isinstance(link, models.AppBskyRichtextFacet.Link) for link in links)
+    assert links[0].uri == "https://arxiv.org/abs/2604.00001"
+    assert links[1].uri == "https://arxiv.org/abs/2604.00002"
+    assert links[2].uri == "https://arxiv.org/abs/2604.00003"
     assert post_to_bluesky.call_args_list[2].kwargs == {
         "image_path": Path("reports/top30.png"),
         "image_alt": "arXiv Upvote Trends top 30 report",
@@ -145,7 +156,7 @@ def test_main_filters_non_arxiv_ids_before_reporting(monkeypatch):
     assert filtered_stats["arxiv_id"].to_list() == ["2604.00001"]
     mocks["capture_arxiv_first_page"].assert_called_once_with(
         "2604.00001",
-        "reports/2604.00001.png",
+        Path("reports/2604.00001.png"),
         max_output_bytes=main_module.MAX_IMAGE_BYTES,
     )
 
@@ -171,8 +182,8 @@ def test_main_captures_first_pages_only_for_new_report_rows(monkeypatch):
     main_module.main()
 
     assert mocks["capture_arxiv_first_page"].call_args_list == [
-        call("2604.00003", "reports/2604.00003.png", max_output_bytes=main_module.MAX_IMAGE_BYTES),
-        call("2604.00002", "reports/2604.00002.png", max_output_bytes=main_module.MAX_IMAGE_BYTES),
+        call("2604.00003", Path("reports/2604.00003.png"), max_output_bytes=main_module.MAX_IMAGE_BYTES),
+        call("2604.00002", Path("reports/2604.00002.png"), max_output_bytes=main_module.MAX_IMAGE_BYTES),
     ]
 
 
