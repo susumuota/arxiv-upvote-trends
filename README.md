@@ -104,6 +104,8 @@ gcloud storage buckets create "gs://$GCS_BUCKET" \
     --uniform-bucket-level-access \
     --public-access-prevention \
     --project="$GOOGLE_CLOUD_PROJECT"
+
+gcloud storage buckets list --format="value(name)" --project="$GOOGLE_CLOUD_PROJECT"
 ```
 
 ## Local Execution
@@ -244,7 +246,14 @@ gcloud secrets add-iam-policy-binding BLUESKY_APP_PASSWORD \
 
 gcloud secrets describe HF_TOKEN --project="$GOOGLE_CLOUD_PROJECT"
 
+gcloud secrets describe BLUESKY_APP_PASSWORD --project="$GOOGLE_CLOUD_PROJECT"
+
 gcloud services enable run.googleapis.com --project="$GOOGLE_CLOUD_PROJECT"
+
+# Delete the job if it already exists
+gcloud run jobs delete "$JOB_NAME" \
+    --region="$REGION" \
+    --project="$GOOGLE_CLOUD_PROJECT"
 
 gcloud run jobs create "$JOB_NAME" \
     --image="${REGION}-docker.pkg.dev/${GOOGLE_CLOUD_PROJECT}/${REPO_NAME}/${IMAGE_NAME}" \
@@ -255,7 +264,7 @@ gcloud run jobs create "$JOB_NAME" \
     --set-secrets="HF_TOKEN=HF_TOKEN:latest,BLUESKY_APP_PASSWORD=BLUESKY_APP_PASSWORD:latest" \
     --max-retries=0 \
     --task-timeout=30m \
-    --memory=1024Mi
+    --memory=2048Mi
 
 gcloud run jobs list \
     --region="$REGION" \
@@ -308,6 +317,55 @@ gcloud scheduler jobs list \
 gcloud logging read "resource.type=cloud_scheduler_job" \
     --project="$GOOGLE_CLOUD_PROJECT" \
     --limit=100 | tail -r
+```
+
+### Updating the Job After Code Changes
+
+After editing source files (e.g. `main.py`), rebuild the image and recreate the job:
+
+```bash
+source .env
+
+REGION="us-central1"
+REPO_NAME="arxiv-upvote-trends"
+IMAGE_NAME="arxiv-upvote-trends"
+SA_NAME="arxiv-upvote-trends-run"
+JOB_NAME="arxiv-upvote-trends"
+
+# Build and push the new image
+gcloud builds submit \
+    --tag="${REGION}-docker.pkg.dev/${GOOGLE_CLOUD_PROJECT}/${REPO_NAME}/${IMAGE_NAME}" \
+    --region="$REGION" \
+    --project="$GOOGLE_CLOUD_PROJECT"
+
+# Delete the existing job
+gcloud run jobs delete "$JOB_NAME" \
+    --region="$REGION" \
+    --project="$GOOGLE_CLOUD_PROJECT"
+
+# Create the job with the updated image
+gcloud run jobs create "$JOB_NAME" \
+    --image="${REGION}-docker.pkg.dev/${GOOGLE_CLOUD_PROJECT}/${REPO_NAME}/${IMAGE_NAME}" \
+    --region="$REGION" \
+    --project="$GOOGLE_CLOUD_PROJECT" \
+    --service-account="${SA_NAME}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+    --set-env-vars="GCS_BUCKET=${GCS_BUCKET},HF_REPO_ID=${HF_REPO_ID},BLUESKY_HANDLE=${BLUESKY_HANDLE},BLUESKY_SERVICE_URL=${BLUESKY_SERVICE_URL}" \
+    --set-secrets="HF_TOKEN=HF_TOKEN:latest,BLUESKY_APP_PASSWORD=BLUESKY_APP_PASSWORD:latest" \
+    --max-retries=0 \
+    --task-timeout=30m \
+    --memory=2048Mi
+
+# Execute the job (optional)
+gcloud run jobs execute "$JOB_NAME" \
+    --region="$REGION" \
+    --project="$GOOGLE_CLOUD_PROJECT" \
+    --async
+
+# View the logs (optional)
+gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=$JOB_NAME" \
+    --project="$GOOGLE_CLOUD_PROJECT" \
+    --limit=100 \
+    --format="value(textPayload)" | tail -r
 ```
 
 ## Development
