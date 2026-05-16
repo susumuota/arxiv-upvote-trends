@@ -39,6 +39,7 @@ def capture_arxiv_first_page(
     resp.raise_for_status()
 
     output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
     current_dpi = dpi
     last_size = 0
     while True:
