@@ -250,11 +250,6 @@ gcloud secrets describe BLUESKY_APP_PASSWORD --project="$GOOGLE_CLOUD_PROJECT"
 
 gcloud services enable run.googleapis.com --project="$GOOGLE_CLOUD_PROJECT"
 
-# Delete the job if it already exists
-gcloud run jobs delete "$JOB_NAME" \
-    --region="$REGION" \
-    --project="$GOOGLE_CLOUD_PROJECT"
-
 gcloud run jobs create "$JOB_NAME" \
     --image="${REGION}-docker.pkg.dev/${GOOGLE_CLOUD_PROJECT}/${REPO_NAME}/${IMAGE_NAME}" \
     --region="$REGION" \
@@ -319,7 +314,7 @@ gcloud logging read "resource.type=cloud_scheduler_job" \
     --limit=100 | tail -r
 ```
 
-### Updating the Job After Code Changes
+### Updating the Job
 
 After editing source files (e.g. `main.py`), rebuild the image and recreate the job:
 
