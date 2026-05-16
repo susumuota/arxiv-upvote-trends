@@ -21,4 +21,4 @@
 
 ## Git Workflow
 
-- Do NOT follow the default git commit workflow. You MUST use the `/git-commit` skill instead.
+- When a task requires creating a commit, use the `/git-commit` skill instead of ad-hoc git commit steps.
