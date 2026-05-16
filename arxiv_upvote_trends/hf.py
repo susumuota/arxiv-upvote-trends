@@ -42,7 +42,7 @@ def search_huggingface(max_papers: int = 300, days: int = 30, wait: float = 1.0)
     """
     api = HfApi()
     now = datetime.now(tz=UTC)
-    dates = [(now - timedelta(days=d)).strftime("%Y-%m-%d") for d in range(days)]
+    dates = [(now - timedelta(days=d + 1)).strftime("%Y-%m-%d") for d in range(days)]
     logger.info("Searching Hugging Face for papers: %s", dates)
     all_papers = []
     for date in dates:
