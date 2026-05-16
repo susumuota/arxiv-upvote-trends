@@ -49,9 +49,9 @@ def build_bluesky_report_post(rows: list[ReportRow]) -> TextBuilder:
     total = len(rows)
     tb.text("arXiv Upvote Trends Top 30\n")
     for i, row in enumerate(rows):
-        tb.link(f"[{i + 1}/{total}]", row.arxiv_url)
-        if i < total - 1:
-            tb.text(" ")
+        tb.text("[")
+        tb.link(f"{i + 1}/{total}", row.arxiv_url)
+        tb.text("]" if i == total - 1 else "] ")
     return tb
 
 
