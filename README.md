@@ -261,6 +261,13 @@ gcloud run jobs create "$JOB_NAME" \
     --task-timeout=30m \
     --memory=2048Mi
 
+# Allow Cloud Scheduler to start this Cloud Run Job.
+gcloud run jobs add-iam-policy-binding "$JOB_NAME" \
+    --member="serviceAccount:${SA_NAME}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+    --role="roles/run.invoker" \
+    --region="$REGION" \
+    --project="$GOOGLE_CLOUD_PROJECT"
+
 gcloud run jobs list \
     --region="$REGION" \
     --project="$GOOGLE_CLOUD_PROJECT"
@@ -290,17 +297,11 @@ SCHEDULE_NAME="arxiv-upvote-trends-schedule"
 
 gcloud services enable cloudscheduler.googleapis.com --project="$GOOGLE_CLOUD_PROJECT"
 
-gcloud run jobs add-iam-policy-binding "$JOB_NAME" \
-    --member="serviceAccount:${SA_NAME}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
-    --role="roles/run.invoker" \
-    --region="$REGION" \
-    --project="$GOOGLE_CLOUD_PROJECT"
-
 gcloud scheduler jobs create http "${SCHEDULE_NAME}" \
     --location="$REGION" \
     --schedule="0 9 * * *" \
     --time-zone="Asia/Tokyo" \
-    --uri="https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${GOOGLE_CLOUD_PROJECT}/jobs/${JOB_NAME}:run" \
+    --uri="https://run.googleapis.com/v2/projects/${GOOGLE_CLOUD_PROJECT}/locations/${REGION}/jobs/${JOB_NAME}:run" \
     --http-method=POST \
     --oauth-service-account-email="${SA_NAME}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
     --project="$GOOGLE_CLOUD_PROJECT"
@@ -316,7 +317,8 @@ gcloud logging read "resource.type=cloud_scheduler_job" \
 
 ### Updating the Job
 
-After editing source files (e.g. `main.py`), rebuild the image and recreate the job:
+After editing source files (e.g. `main.py`), rebuild the image and update the job.
+The update command changes only the container image and keeps the existing service account, environment variables, secrets, resource settings, and IAM policy.
 
 ```bash
 source .env
@@ -324,7 +326,6 @@ source .env
 REGION="us-central1"
 REPO_NAME="arxiv-upvote-trends"
 IMAGE_NAME="arxiv-upvote-trends"
-SA_NAME="arxiv-upvote-trends-run"
 JOB_NAME="arxiv-upvote-trends"
 
 # Build and push the new image
@@ -333,22 +334,11 @@ gcloud builds submit \
     --region="$REGION" \
     --project="$GOOGLE_CLOUD_PROJECT"
 
-# Delete the existing job
-gcloud run jobs delete "$JOB_NAME" \
-    --region="$REGION" \
-    --project="$GOOGLE_CLOUD_PROJECT"
-
-# Create the job with the updated image
-gcloud run jobs create "$JOB_NAME" \
+# Update the job with the new image
+gcloud run jobs update "$JOB_NAME" \
     --image="${REGION}-docker.pkg.dev/${GOOGLE_CLOUD_PROJECT}/${REPO_NAME}/${IMAGE_NAME}" \
     --region="$REGION" \
-    --project="$GOOGLE_CLOUD_PROJECT" \
-    --service-account="${SA_NAME}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
-    --set-env-vars="GCS_BUCKET=${GCS_BUCKET},HF_REPO_ID=${HF_REPO_ID},BLUESKY_HANDLE=${BLUESKY_HANDLE},BLUESKY_SERVICE_URL=${BLUESKY_SERVICE_URL}" \
-    --set-secrets="HF_TOKEN=HF_TOKEN:latest,BLUESKY_APP_PASSWORD=BLUESKY_APP_PASSWORD:latest" \
-    --max-retries=0 \
-    --task-timeout=30m \
-    --memory=2048Mi
+    --project="$GOOGLE_CLOUD_PROJECT"
 
 # Execute the job (optional)
 gcloud run jobs execute "$JOB_NAME" \
