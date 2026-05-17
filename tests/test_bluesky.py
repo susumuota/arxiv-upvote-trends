@@ -24,7 +24,7 @@ from arxiv_upvote_trends.bluesky import (
     build_reply_ref,
     post_to_bluesky,
 )
-from arxiv_upvote_trends.report import ReportRow
+from arxiv_upvote_trends.report import ReportRow, ReportSource
 
 
 def test_build_bluesky_paper_post_includes_row_details_and_url():
@@ -320,15 +320,21 @@ def _row(
         score=score,
         num_comments=0,
         count=1,
-        alphaxiv_score=score,
-        huggingface_score=0,
-        huggingface_comments=0,
         arxiv_url=f"https://arxiv.org/abs/{arxiv_id}",
-        alphaxiv_url=f"https://www.alphaxiv.org/abs/{arxiv_id}",
-        huggingface_url=f"https://huggingface.co/papers/{arxiv_id}",
-        source_urls=(),
-        alphaxiv_published_at=datetime(2026, 5, 1, tzinfo=UTC),
-        huggingface_published_at=datetime(2026, 5, 2, tzinfo=UTC),
+        sources=(
+            ReportSource(
+                "alphaxiv",
+                f"https://www.alphaxiv.org/abs/{arxiv_id}",
+                score,
+                published_at=datetime(2026, 5, 1, tzinfo=UTC),
+            ),
+            ReportSource(
+                "huggingface",
+                f"https://huggingface.co/papers/{arxiv_id}",
+                0,
+                published_at=datetime(2026, 5, 2, tzinfo=UTC),
+            ),
+        ),
         abstract=abstract,
         is_new=is_new,
     )

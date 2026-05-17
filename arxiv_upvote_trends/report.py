@@ -6,11 +6,41 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from html import escape
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import pandas as pd
 from pdf2image import convert_from_path
 from PIL import Image
+
+type ReportSourceKind = Literal["alphaxiv", "huggingface"]
+
+_SOURCE_CLASSES: dict[ReportSourceKind, str] = {
+    "alphaxiv": "ax",
+    "huggingface": "hf",
+}
+_SOURCE_LABELS: dict[ReportSourceKind, str] = {
+    "alphaxiv": "alphaXiv",
+    "huggingface": "Hugging Face",
+}
+_SOURCE_CAPTIONS: dict[ReportSourceKind, str] = {
+    "alphaxiv": "alphaXiv",
+    "huggingface": "HF",
+}
+
+
+@dataclass(frozen=True)
+class ReportSource:
+    """One discussion source for a report row."""
+
+    kind: ReportSourceKind
+    url: str
+    score: int
+    num_comments: int = 0
+    published_at: datetime | None = None
+
+    @property
+    def label(self) -> str:
+        return _SOURCE_LABELS[self.kind]
 
 
 @dataclass(frozen=True)
@@ -24,15 +54,8 @@ class ReportRow:
     score: int
     num_comments: int
     count: int
-    alphaxiv_score: int
-    huggingface_score: int
-    huggingface_comments: int
     arxiv_url: str
-    alphaxiv_url: str
-    huggingface_url: str
-    source_urls: tuple[str, ...]
-    alphaxiv_published_at: datetime | None = None
-    huggingface_published_at: datetime | None = None
+    sources: tuple[ReportSource, ...]
     abstract: str = ""
     is_new: bool = True
 
@@ -53,9 +76,8 @@ def build_report_rows(
         arxiv_id = _text(stat.get("arxiv_id"))
         ax_paper = ax_by_id.get(arxiv_id, {})
         hf_paper = hf_by_id.get(arxiv_id, {})
-        source_urls = tuple(_iter_urls(stat.get("url")))
-        alphaxiv_url = _source_url(source_urls, "alphaxiv.org") or _alphaxiv_url(arxiv_id, ax_paper)
-        huggingface_url = _source_url(source_urls, "huggingface.co") or _huggingface_url(arxiv_id, hf_paper)
+        stat_urls = tuple(_iter_urls(stat.get("url")))
+        sources = _build_sources(arxiv_id, stat_urls, ax_paper, hf_paper)
 
         abstract = _first_text(hf_paper, ("summary",)) or _first_text(ax_paper, ("abstract",))
 
@@ -68,15 +90,8 @@ def build_report_rows(
                 score=_int(stat.get("score")),
                 num_comments=_int(stat.get("num_comments")),
                 count=_int(stat.get("count")),
-                alphaxiv_score=_alphaxiv_score(ax_paper),
-                huggingface_score=_int(hf_paper.get("upvotes")),
-                huggingface_comments=_int(hf_paper.get("comments")),
                 arxiv_url=f"https://arxiv.org/abs/{arxiv_id}",
-                alphaxiv_url=alphaxiv_url,
-                huggingface_url=huggingface_url,
-                source_urls=source_urls,
-                alphaxiv_published_at=_published_at(ax_paper, ("publication_date",)),
-                huggingface_published_at=_published_at(hf_paper, ("published_at",)),
+                sources=sources,
                 abstract=abstract,
                 is_new=arxiv_id not in known_arxiv_ids,
             )
@@ -202,8 +217,6 @@ def _paper_rows_html(rows: list[ReportRow]) -> str:
 
 def _paper_row_html(row: ReportRow, max_score: int) -> str:
     authors = f'<p class="authors">{escape(row.authors)}</p>' if row.authors else ""
-    ax_pct = row.alphaxiv_score / max_score * 100
-    hf_pct = row.huggingface_score / max_score * 100
     rank_class = f" top{row.rank}" if row.rank <= 3 else ""
     new_class = " new-paper" if row.is_new else ""
     new_tag = '<span class="tag new">NEW</span>' if row.is_new else ""
@@ -227,13 +240,10 @@ def _paper_row_html(row: ReportRow, max_score: int) -> str:
         <div class="score-total">{row.score:,}<small>Total</small>{comment_tag}</div>
         <div class="bar-col">
           <div class="bar">
-            <div class="bar-ax" style="width:{ax_pct:.1f}%"></div>
-            <div class="bar-hf" style="width:{hf_pct:.1f}%"></div>
+            {_source_bar_html(row.sources, max_score)}
           </div>
           <div class="bar-caption">
-            <span class="cap-ax">alphaXiv {row.alphaxiv_score:,}</span>
-            <span class="cap-sep">·</span>
-            <span class="cap-hf">HF {row.huggingface_score:,}</span>
+            {_source_caption_html(row.sources)}
           </div>
         </div>
       </div>
@@ -245,13 +255,67 @@ def _arxiv_tag_html(row: ReportRow) -> str:
 
 
 def _link_tags_html(row: ReportRow) -> str:
-    links = [
-        ("alphaXiv", row.alphaxiv_url, "ax"),
-        ("Hugging Face", row.huggingface_url, "hf"),
-    ]
     return "".join(
-        f'<a class="tag link {cls}" href="{escape(url)}">{escape(label)}</a>' for label, url, cls in links if url
+        f'<a class="tag link {_source_class(source)}" href="{escape(source.url)}">{escape(source.label)}</a>'
+        for source in row.sources
+        if source.url
     )
+
+
+def _source_bar_html(sources: tuple[ReportSource, ...], max_score: int) -> str:
+    return "\n            ".join(
+        f'<div class="bar-{_source_class(source)}" style="width:{source.score / max_score * 100:.1f}%"></div>'
+        for source in sources
+    )
+
+
+def _source_caption_html(sources: tuple[ReportSource, ...]) -> str:
+    return '\n            <span class="cap-sep">·</span>\n            '.join(
+        f'<span class="cap-{_source_class(source)}">{_source_caption(source)} {source.score:,}</span>'
+        for source in sources
+    )
+
+
+def _source_class(source: ReportSource) -> str:
+    return _SOURCE_CLASSES[source.kind]
+
+
+def _source_caption(source: ReportSource) -> str:
+    return _SOURCE_CAPTIONS[source.kind]
+
+
+def _build_sources(
+    arxiv_id: str,
+    stat_urls: tuple[str, ...],
+    ax_paper: dict,
+    hf_paper: dict,
+) -> tuple[ReportSource, ...]:
+    sources: list[ReportSource] = []
+
+    alphaxiv_url = _source_url(stat_urls, "alphaxiv.org")
+    if alphaxiv_url or ax_paper:
+        sources.append(
+            ReportSource(
+                "alphaxiv",
+                alphaxiv_url or _alphaxiv_url(arxiv_id, ax_paper),
+                _alphaxiv_score(ax_paper),
+                published_at=_published_at(ax_paper, ("publication_date",)),
+            )
+        )
+
+    huggingface_url = _source_url(stat_urls, "huggingface.co")
+    if huggingface_url or hf_paper:
+        sources.append(
+            ReportSource(
+                "huggingface",
+                huggingface_url or _huggingface_url(arxiv_id, hf_paper),
+                _int(hf_paper.get("upvotes")),
+                num_comments=_int(hf_paper.get("comments")),
+                published_at=_published_at(hf_paper, ("published_at",)),
+            )
+        )
+
+    return tuple(sources)
 
 
 def _index_papers(papers: list[dict], keys: Iterable[str]) -> dict[str, dict]:

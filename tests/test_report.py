@@ -9,6 +9,7 @@ from PIL import Image
 
 from arxiv_upvote_trends.report import (
     ReportRow,
+    ReportSource,
     build_report_rows,
     convert_pdf_to_png,
     render_report_html,
@@ -76,18 +77,22 @@ def test_build_report_rows_combines_stats_with_source_papers():
             score=17,
             num_comments=2,
             count=2,
-            alphaxiv_score=10,
-            huggingface_score=7,
-            huggingface_comments=2,
             arxiv_url="https://arxiv.org/abs/2604.00001",
-            alphaxiv_url="https://www.alphaxiv.org/abs/2604.00001",
-            huggingface_url="https://huggingface.co/papers/2604.00001",
-            source_urls=(
-                "https://www.alphaxiv.org/abs/2604.00001",
-                "https://huggingface.co/papers/2604.00001",
+            sources=(
+                ReportSource(
+                    "alphaxiv",
+                    "https://www.alphaxiv.org/abs/2604.00001",
+                    10,
+                    published_at=datetime(2026, 4, 20, 12, 0, tzinfo=UTC),
+                ),
+                ReportSource(
+                    "huggingface",
+                    "https://huggingface.co/papers/2604.00001",
+                    7,
+                    num_comments=2,
+                    published_at=datetime(2026, 4, 22, 0, 0, tzinfo=UTC),
+                ),
             ),
-            alphaxiv_published_at=datetime(2026, 4, 20, 12, 0, tzinfo=UTC),
-            huggingface_published_at=datetime(2026, 4, 22, 0, 0, tzinfo=UTC),
         ),
         ReportRow(
             rank=2,
@@ -97,14 +102,15 @@ def test_build_report_rows_combines_stats_with_source_papers():
             score=4,
             num_comments=0,
             count=1,
-            alphaxiv_score=4,
-            huggingface_score=0,
-            huggingface_comments=0,
             arxiv_url="https://arxiv.org/abs/2604.00002",
-            alphaxiv_url="https://www.alphaxiv.org/abs/2604.00002",
-            huggingface_url="https://huggingface.co/papers/2604.00002",
-            source_urls=("https://www.alphaxiv.org/abs/2604.00002",),
-            alphaxiv_published_at=datetime(2026, 4, 21, 8, 30, tzinfo=UTC),
+            sources=(
+                ReportSource(
+                    "alphaxiv",
+                    "https://www.alphaxiv.org/abs/2604.00002",
+                    4,
+                    published_at=datetime(2026, 4, 21, 8, 30, tzinfo=UTC),
+                ),
+            ),
         ),
     ]
 
@@ -177,15 +183,8 @@ def test_report_html_escapes_paper_fields():
             score=1,
             num_comments=0,
             count=1,
-            alphaxiv_score=1,
-            huggingface_score=0,
-            huggingface_comments=0,
             arxiv_url="https://arxiv.org/abs/2604.00001",
-            alphaxiv_url="",
-            huggingface_url="",
-            source_urls=(),
-            alphaxiv_published_at=_DT,
-            huggingface_published_at=_DT,
+            sources=_sources(ax_score=1),
         )
     ]
 
@@ -206,15 +205,8 @@ def test_report_html_summarizes_totals_in_generated_line():
             score=12,
             num_comments=3,
             count=2,
-            alphaxiv_score=8,
-            huggingface_score=4,
-            huggingface_comments=0,
             arxiv_url="https://arxiv.org/abs/2604.00001",
-            alphaxiv_url="",
-            huggingface_url="",
-            source_urls=(),
-            alphaxiv_published_at=_DT,
-            huggingface_published_at=_DT,
+            sources=_sources(ax_score=8, hf_score=4),
         ),
         ReportRow(
             rank=2,
@@ -224,15 +216,8 @@ def test_report_html_summarizes_totals_in_generated_line():
             score=5,
             num_comments=1,
             count=1,
-            alphaxiv_score=5,
-            huggingface_score=0,
-            huggingface_comments=0,
             arxiv_url="https://arxiv.org/abs/2604.00002",
-            alphaxiv_url="",
-            huggingface_url="",
-            source_urls=(),
-            alphaxiv_published_at=_DT,
-            huggingface_published_at=_DT,
+            sources=_sources(ax_score=5),
         ),
     ]
 
@@ -255,15 +240,8 @@ def test_report_html_marks_new_papers():
             score=2,
             num_comments=0,
             count=1,
-            alphaxiv_score=2,
-            huggingface_score=0,
-            huggingface_comments=0,
             arxiv_url="https://arxiv.org/abs/2604.00001",
-            alphaxiv_url="",
-            huggingface_url="",
-            source_urls=(),
-            alphaxiv_published_at=_DT,
-            huggingface_published_at=_DT,
+            sources=_sources(ax_score=2),
             is_new=True,
         ),
         ReportRow(
@@ -274,15 +252,8 @@ def test_report_html_marks_new_papers():
             score=1,
             num_comments=0,
             count=1,
-            alphaxiv_score=1,
-            huggingface_score=0,
-            huggingface_comments=0,
             arxiv_url="https://arxiv.org/abs/2604.00002",
-            alphaxiv_url="",
-            huggingface_url="",
-            source_urls=(),
-            alphaxiv_published_at=_DT,
-            huggingface_published_at=_DT,
+            sources=_sources(ax_score=1),
             is_new=False,
         ),
     ]
@@ -306,15 +277,8 @@ def test_report_html_links_arxiv_id_to_abs_page():
             score=2,
             num_comments=0,
             count=1,
-            alphaxiv_score=2,
-            huggingface_score=0,
-            huggingface_comments=0,
             arxiv_url="https://arxiv.org/abs/2604.00001",
-            alphaxiv_url="https://www.alphaxiv.org/abs/2604.00001",
-            huggingface_url="",
-            source_urls=(),
-            alphaxiv_published_at=_DT,
-            huggingface_published_at=_DT,
+            sources=_sources(ax_score=2, ax_url="https://www.alphaxiv.org/abs/2604.00001"),
         )
     ]
 
@@ -336,15 +300,8 @@ def test_report_html_places_comments_under_total_score():
             score=12,
             num_comments=3,
             count=1,
-            alphaxiv_score=8,
-            huggingface_score=4,
-            huggingface_comments=0,
             arxiv_url="https://arxiv.org/abs/2604.00001",
-            alphaxiv_url="",
-            huggingface_url="",
-            source_urls=(),
-            alphaxiv_published_at=_DT,
-            huggingface_published_at=_DT,
+            sources=_sources(ax_score=8, hf_score=4),
         )
     ]
 
@@ -363,6 +320,22 @@ def test_render_report_html_writes_file(tmp_path):
 
     assert result == output_path
     assert "arXiv Upvote Trends Top 0" in output_path.read_text(encoding="utf-8")
+
+
+def _sources(
+    *,
+    ax_score: int = 0,
+    hf_score: int = 0,
+    ax_url: str = "",
+    hf_url: str = "",
+    hf_comments: int = 0,
+) -> tuple[ReportSource, ...]:
+    sources = []
+    if ax_url or ax_score:
+        sources.append(ReportSource("alphaxiv", ax_url, ax_score, published_at=_DT))
+    if hf_url or hf_score or hf_comments:
+        sources.append(ReportSource("huggingface", hf_url, hf_score, num_comments=hf_comments, published_at=_DT))
+    return tuple(sources)
 
 
 def test_convert_pdf_to_png_combines_multiple_pages(tmp_path):

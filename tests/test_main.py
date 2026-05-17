@@ -13,6 +13,7 @@ from atproto_client.utils.text_builder import TextBuilder
 
 import main as main_module
 from arxiv_upvote_trends.bluesky import LinkCard
+from arxiv_upvote_trends.report import ReportSource
 
 _STUB_LINK_CARD = LinkCard(title="Page Title", description="Page description", thumb=b"fake-image")
 
@@ -205,9 +206,7 @@ def test_main_posts_reply_thread_ordered_by_score(monkeypatch):
     post_to_bluesky = Mock(side_effect=[paper_result, hf_result, ax_result, report_result])
     monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
     row = _report_row("2604.00001", is_new=True)
-    row.huggingface_score = 20
-    row.alphaxiv_score = 8
-    row.huggingface_comments = 3
+    row.sources = _sources("2604.00001", ax_score=8, hf_score=20, hf_comments=3)
     mocks = _stub_pipeline(monkeypatch)
     mocks["build_report_rows"].return_value = [row]
     mocks["capture_arxiv_first_page"].return_value = Path("reports/2604.00001.png")
@@ -241,8 +240,7 @@ def test_main_posts_alphaxiv_reply_under_paper_when_hf_reply_fails(monkeypatch):
     post_to_bluesky = Mock(side_effect=[paper_result, RuntimeError("hf failed"), ax_result, report_result])
     monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
     row = _report_row("2604.00001", is_new=True)
-    row.huggingface_score = 20
-    row.alphaxiv_score = 8
+    row.sources = _sources("2604.00001", ax_score=8, hf_score=20)
     mocks = _stub_pipeline(monkeypatch)
     mocks["build_report_rows"].return_value = [row]
     mocks["capture_arxiv_first_page"].return_value = Path("reports/2604.00001.png")
@@ -302,13 +300,25 @@ def _report_row(arxiv_id: str, is_new: bool, rank: int = 1) -> SimpleNamespace:
         score=10,
         num_comments=0,
         count=1,
-        alphaxiv_score=5,
-        huggingface_score=5,
-        huggingface_comments=0,
         arxiv_url=f"https://arxiv.org/abs/{arxiv_id}",
-        alphaxiv_url=f"https://www.alphaxiv.org/abs/{arxiv_id}",
-        alphaxiv_published_at=datetime(2026, 5, 1, tzinfo=UTC),
-        huggingface_url=f"https://huggingface.co/papers/{arxiv_id}",
-        huggingface_published_at=datetime(2026, 5, 2, tzinfo=UTC),
+        sources=_sources(arxiv_id, ax_score=5, hf_score=5),
         is_new=is_new,
+    )
+
+
+def _sources(arxiv_id: str, *, ax_score: int, hf_score: int, hf_comments: int = 0) -> tuple[ReportSource, ...]:
+    return (
+        ReportSource(
+            "alphaxiv",
+            f"https://www.alphaxiv.org/abs/{arxiv_id}",
+            ax_score,
+            published_at=datetime(2026, 5, 1, tzinfo=UTC),
+        ),
+        ReportSource(
+            "huggingface",
+            f"https://huggingface.co/papers/{arxiv_id}",
+            hf_score,
+            num_comments=hf_comments,
+            published_at=datetime(2026, 5, 2, tzinfo=UTC),
+        ),
     )

@@ -106,40 +106,30 @@ def _post_new_papers(report_rows):
             )
             if paper_result is None:
                 continue
-            sources = [
-                (
-                    "Hugging Face",
-                    row.huggingface_url,
-                    row.huggingface_score,
-                    row.huggingface_comments,
-                    row.huggingface_published_at,
-                ),
-                ("alphaXiv", row.alphaxiv_url, row.alphaxiv_score, 0, row.alphaxiv_published_at),
-            ]
-            sources.sort(key=lambda s: -s[2])
+            sources = sorted(row.sources, key=lambda source: -source.score)
             parent = paper_result
-            for i, (label, url, score, num_comments, published_at) in enumerate(sources):
+            for i, source in enumerate(sources):
                 try:
-                    card = fetch_link_card(url)
+                    card = fetch_link_card(source.url)
                 except Exception:
-                    logger.warning("Failed to fetch link card for %s", url)
+                    logger.warning("Failed to fetch link card for %s", source.url)
                     card = None
                 reply_text = build_bluesky_source_reply(
-                    label,
-                    url,
-                    score,
-                    num_comments,
+                    source.label,
+                    source.url,
+                    source.score,
+                    source.num_comments,
                     i + 1,
                     len(sources),
-                    published_at=published_at,
+                    published_at=source.published_at,
                 )
                 reply_embed = build_external_embed(
-                    url, card.title if card else label, card.description if card else row.title
+                    source.url, card.title if card else source.label, card.description if card else row.title
                 )
                 reply_ref = build_reply_ref(root=paper_result, parent=parent)
                 time.sleep(_BLUESKY_POST_WAIT)
                 result = _try_post_to_bluesky(
-                    f"{label} reply for {row.arxiv_id}",
+                    f"{source.label} reply for {row.arxiv_id}",
                     reply_text,
                     reply_to=reply_ref,
                     embed=reply_embed,
