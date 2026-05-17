@@ -16,8 +16,12 @@ from .report import ReportRow
 
 DEFAULT_SERVICE_URL = "https://bsky.social"
 DEFAULT_TIMEOUT = 30
+# https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/feed/post.json
 MAX_POST_LENGTH = 300
+# https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/embed/images.json
 MAX_IMAGE_BYTES = 1_000_000
+# TODO: find the official max alt text length in the AT Protocol spec
+_MAX_ALT_LENGTH = 2_000
 _MIN_TITLE_LENGTH = 12
 logger = logging.getLogger(__name__)
 
@@ -36,7 +40,14 @@ def build_bluesky_paper_post(row: ReportRow) -> TextBuilder:
         text = _format_paper_post(row, title_length)
         if len(text) <= MAX_POST_LENGTH:
             return TextBuilder().text(text)
-    return TextBuilder().text(_fit_post(_format_paper_post(row, _MIN_TITLE_LENGTH)))
+    return TextBuilder().text(_truncate(_format_paper_post(row, _MIN_TITLE_LENGTH), MAX_POST_LENGTH))
+
+
+def build_bluesky_report_alt(rows: list[ReportRow]) -> str:
+    """Build alt text for the top report image."""
+    total = len(rows)
+    text = "\n".join(f"{i + 1}/{total} {row.arxiv_url}" for i, row in enumerate(rows))
+    return _truncate(text, _MAX_ALT_LENGTH)
 
 
 def build_bluesky_report_post(rows: list[ReportRow]) -> TextBuilder:
@@ -131,15 +142,8 @@ def _format_paper_post(row: ReportRow, title_length: int) -> str:
 
 
 def _truncate(text: str, max_length: int) -> str:
-    clean_text = " ".join(text.split())
-    if len(clean_text) <= max_length:
-        return clean_text
-    if max_length <= 3:
-        return clean_text[:max_length]
-    return f"{clean_text[: max_length - 3].rstrip()}..."
-
-
-def _fit_post(text: str) -> str:
-    if len(text) <= MAX_POST_LENGTH:
+    if len(text) <= max_length:
         return text
-    return _truncate(text, MAX_POST_LENGTH)
+    if max_length <= 3:
+        return text[:max_length]
+    return f"{text[: max_length - 3].rstrip()}..."

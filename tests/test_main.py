@@ -40,7 +40,7 @@ def test_main_posts_top30_report_to_bluesky_without_new_rows(monkeypatch):
     assert report_arg.build_text() == "arXiv Upvote Trends Top 30\nNo papers found."
     assert post_to_bluesky.call_args.kwargs == {
         "image_path": Path("reports/top30.png"),
-        "image_alt": "arXiv Upvote Trends top 30 report",
+        "image_alt": "",
         "timeout": 60,
     }
 
@@ -133,7 +133,11 @@ def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
     assert links[2].uri == "https://arxiv.org/abs/2604.00003"
     assert post_to_bluesky.call_args_list[2].kwargs == {
         "image_path": Path("reports/top30.png"),
-        "image_alt": "arXiv Upvote Trends top 30 report",
+        "image_alt": (
+            "1/3 https://arxiv.org/abs/2604.00001\n"
+            "2/3 https://arxiv.org/abs/2604.00002\n"
+            "3/3 https://arxiv.org/abs/2604.00003"
+        ),
         "timeout": 60,
     }
 

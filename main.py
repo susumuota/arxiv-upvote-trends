@@ -12,6 +12,7 @@ from arxiv_upvote_trends import (
     MAX_IMAGE_BYTES,
     aggregate_stats,
     build_bluesky_paper_post,
+    build_bluesky_report_alt,
     build_bluesky_report_post,
     build_report_rows,
     capture_arxiv_first_page,
@@ -108,11 +109,12 @@ def _post_report(report_rows):
     logger.info("Saved top 30 report to %s", report_png_path)
     if os.environ.get("BLUESKY_HANDLE", ""):
         report_post_text = build_bluesky_report_post(report_rows)
+        report_alt_text = build_bluesky_report_alt(report_rows)
         _try_post_to_bluesky(
             "top 30 report",
             report_post_text,
             image_path=report_png_path,
-            image_alt="arXiv Upvote Trends top 30 report",
+            image_alt=report_alt_text,
             timeout=60,
         )
 
