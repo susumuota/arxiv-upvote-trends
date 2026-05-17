@@ -4,6 +4,7 @@
 from .alphaxiv import extract_alphaxiv_stats, search_alphaxiv
 from .bluesky import (
     MAX_IMAGE_BYTES,
+    build_bluesky_paper_alt,
     build_bluesky_paper_post,
     build_bluesky_report_alt,
     build_bluesky_report_post,
@@ -21,6 +22,7 @@ from .stats import aggregate_stats, is_arxiv_id
 __all__ = [
     "MAX_IMAGE_BYTES",
     "aggregate_stats",
+    "build_bluesky_paper_alt",
     "build_bluesky_paper_post",
     "build_bluesky_report_alt",
     "build_bluesky_report_post",

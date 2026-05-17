@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from arxiv_upvote_trends import (
     MAX_IMAGE_BYTES,
     aggregate_stats,
+    build_bluesky_paper_alt,
     build_bluesky_paper_post,
     build_bluesky_report_alt,
     build_bluesky_report_post,
@@ -86,10 +87,9 @@ def _post_new_papers(report_rows):
         except Exception:
             logger.exception("Failed to capture first page for %s", row.arxiv_id)
             continue
-        title = getattr(row, "title", "") or row.arxiv_id
-        image_alt = f"First page of arXiv:{row.arxiv_id}: {title}"
         logger.info("Captured arXiv first page for %s", row.arxiv_id)
         if bluesky_handle:
+            image_alt = build_bluesky_paper_alt(row)
             post_text = build_bluesky_paper_post(row, total=len(report_rows))
             _try_post_to_bluesky(f"post for {row.arxiv_id}", post_text, image_path=image_path, image_alt=image_alt)
 

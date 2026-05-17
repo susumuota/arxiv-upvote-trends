@@ -101,6 +101,29 @@ def test_build_report_rows_combines_stats_with_source_papers():
     ]
 
 
+def test_build_report_rows_extracts_abstract_with_hf_priority():
+    df_stats = pd.DataFrame(
+        [
+            {"arxiv_id": "2604.00001", "score": 17, "num_comments": 0, "count": 2, "url": []},
+            {"arxiv_id": "2604.00002", "score": 4, "num_comments": 0, "count": 1, "url": []},
+            {"arxiv_id": "2604.00003", "score": 1, "num_comments": 0, "count": 1, "url": []},
+        ]
+    )
+    ax_papers = [
+        {"universal_paper_id": "2604.00001", "title": "Paper 1", "abstract": "alphaXiv abstract"},
+        {"universal_paper_id": "2604.00002", "title": "Paper 2", "abstract": "only alphaXiv"},
+    ]
+    hf_papers = [
+        {"id": "2604.00001", "title": "Paper 1", "summary": "HF summary"},
+    ]
+
+    rows = build_report_rows(df_stats, ax_papers, hf_papers)
+
+    assert rows[0].abstract == "HF summary"
+    assert rows[1].abstract == "only alphaXiv"
+    assert rows[2].abstract == ""
+
+
 def test_build_report_rows_respects_limit():
     df_stats = pd.DataFrame(
         [

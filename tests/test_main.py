@@ -232,6 +232,7 @@ def _report_row(arxiv_id: str, is_new: bool, rank: int = 1) -> SimpleNamespace:
         arxiv_id=arxiv_id,
         title=f"Paper {rank}",
         authors="",
+        abstract="",
         score=10,
         num_comments=0,
         count=1,

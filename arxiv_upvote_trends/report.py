@@ -31,6 +31,7 @@ class ReportRow:
     alphaxiv_url: str
     huggingface_url: str
     source_urls: tuple[str, ...]
+    abstract: str = ""
     is_new: bool = True
 
 
@@ -54,6 +55,8 @@ def build_report_rows(
         alphaxiv_url = _source_url(source_urls, "alphaxiv.org") or _alphaxiv_url(arxiv_id, ax_paper)
         huggingface_url = _source_url(source_urls, "huggingface.co") or _huggingface_url(arxiv_id, hf_paper)
 
+        abstract = _first_text(hf_paper, ("summary",)) or _first_text(ax_paper, ("abstract",))
+
         rows.append(
             ReportRow(
                 rank=rank,
@@ -70,6 +73,7 @@ def build_report_rows(
                 alphaxiv_url=alphaxiv_url,
                 huggingface_url=huggingface_url,
                 source_urls=source_urls,
+                abstract=abstract,
                 is_new=arxiv_id not in known_arxiv_ids,
             )
         )

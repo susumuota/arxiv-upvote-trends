@@ -15,6 +15,7 @@ from arxiv_upvote_trends.bluesky import (
     DEFAULT_TIMEOUT,
     MAX_IMAGE_BYTES,
     MAX_POST_LENGTH,
+    build_bluesky_paper_alt,
     build_bluesky_paper_post,
     build_bluesky_report_post,
     post_to_bluesky,
@@ -297,7 +298,16 @@ def test_post_to_bluesky_sanitizes_send_post_errors(mock_client_cls, monkeypatch
     assert exc_info.value.__cause__ is None
 
 
-def _row(rank: int, arxiv_id: str, title: str, score: int, *, authors: str = "", is_new: bool = True) -> ReportRow:
+def _row(
+    rank: int,
+    arxiv_id: str,
+    title: str,
+    score: int,
+    *,
+    authors: str = "",
+    abstract: str = "",
+    is_new: bool = True,
+) -> ReportRow:
     return ReportRow(
         rank=rank,
         arxiv_id=arxiv_id,
@@ -313,5 +323,27 @@ def _row(rank: int, arxiv_id: str, title: str, score: int, *, authors: str = "",
         alphaxiv_url=f"https://www.alphaxiv.org/abs/{arxiv_id}",
         huggingface_url=f"https://huggingface.co/papers/{arxiv_id}",
         source_urls=(),
+        abstract=abstract,
         is_new=is_new,
     )
+
+
+def test_build_bluesky_paper_alt_uses_abstract():
+    row = _row(rank=1, arxiv_id="2604.00001", title="Title", score=10, abstract="This paper proposes a method.")
+
+    assert build_bluesky_paper_alt(row) == "This paper proposes a method."
+
+
+def test_build_bluesky_paper_alt_falls_back_to_title():
+    row = _row(rank=1, arxiv_id="2604.00001", title="Some title", score=10)
+
+    assert build_bluesky_paper_alt(row) == "First page of arXiv:2604.00001: Some title"
+
+
+def test_build_bluesky_paper_alt_truncates_long_abstract():
+    row = _row(rank=1, arxiv_id="2604.00001", title="Title", score=10, abstract="x" * 3000)
+
+    result = build_bluesky_paper_alt(row)
+
+    assert len(result) <= 2000
+    assert result.endswith("...")

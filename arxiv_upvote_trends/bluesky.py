@@ -72,6 +72,14 @@ def build_bluesky_report_alt(rows: list[ReportRow]) -> str:
     return _truncate(text, _MAX_ALT_LENGTH)
 
 
+def build_bluesky_paper_alt(row: ReportRow) -> str:
+    """Build alt text for a paper first-page image."""
+    if row.abstract:
+        return _truncate(row.abstract, _MAX_ALT_LENGTH)
+    title = row.title or row.arxiv_id
+    return _truncate(f"First page of arXiv:{row.arxiv_id}: {title}", _MAX_ALT_LENGTH)
+
+
 def build_bluesky_report_post(rows: list[ReportRow]) -> TextBuilder:
     """Build one Bluesky post for the top report image."""
     tb = TextBuilder()
