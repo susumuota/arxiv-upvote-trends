@@ -31,6 +31,8 @@ class ReportRow:
     alphaxiv_url: str
     huggingface_url: str
     source_urls: tuple[str, ...]
+    alphaxiv_published_at: datetime | None = None
+    huggingface_published_at: datetime | None = None
     abstract: str = ""
     is_new: bool = True
 
@@ -73,6 +75,8 @@ def build_report_rows(
                 alphaxiv_url=alphaxiv_url,
                 huggingface_url=huggingface_url,
                 source_urls=source_urls,
+                alphaxiv_published_at=_published_at(ax_paper, ("publication_date",)),
+                huggingface_published_at=_published_at(hf_paper, ("published_at",)),
                 abstract=abstract,
                 is_new=arxiv_id not in known_arxiv_ids,
             )
@@ -320,6 +324,14 @@ def _text(value: Any) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+
+def _published_at(paper: dict, keys: Iterable[str]) -> datetime | None:
+    for key in keys:
+        value = paper.get(key)
+        if value:
+            return datetime.fromisoformat(str(value))
+    return None
 
 
 def _int(value: Any) -> int:

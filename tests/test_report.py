@@ -15,6 +15,8 @@ from arxiv_upvote_trends.report import (
     report_html,
 )
 
+_DT = datetime(2026, 5, 1, tzinfo=UTC)
+
 
 def test_build_report_rows_combines_stats_with_source_papers():
     df_stats = pd.DataFrame(
@@ -43,11 +45,13 @@ def test_build_report_rows_combines_stats_with_source_papers():
             "universal_paper_id": "2604.00001",
             "title": "alphaXiv title",
             "metrics": {"public_total_votes": 10},
+            "publication_date": "2026-04-20T12:00:00.000Z",
         },
         {
             "universal_paper_id": "2604.00002",
             "title": "alphaXiv only title",
             "metrics": {"public_total_votes": 4},
+            "publication_date": "2026-04-21T08:30:00.000Z",
         },
     ]
     hf_papers = [
@@ -57,6 +61,7 @@ def test_build_report_rows_combines_stats_with_source_papers():
             "authors": [{"name": "Ada"}, {"name": "Grace"}],
             "upvotes": 7,
             "comments": 2,
+            "published_at": "2026-04-22 00:00:00+00:00",
         }
     ]
 
@@ -81,6 +86,8 @@ def test_build_report_rows_combines_stats_with_source_papers():
                 "https://www.alphaxiv.org/abs/2604.00001",
                 "https://huggingface.co/papers/2604.00001",
             ),
+            alphaxiv_published_at=datetime(2026, 4, 20, 12, 0, tzinfo=UTC),
+            huggingface_published_at=datetime(2026, 4, 22, 0, 0, tzinfo=UTC),
         ),
         ReportRow(
             rank=2,
@@ -97,6 +104,7 @@ def test_build_report_rows_combines_stats_with_source_papers():
             alphaxiv_url="https://www.alphaxiv.org/abs/2604.00002",
             huggingface_url="https://huggingface.co/papers/2604.00002",
             source_urls=("https://www.alphaxiv.org/abs/2604.00002",),
+            alphaxiv_published_at=datetime(2026, 4, 21, 8, 30, tzinfo=UTC),
         ),
     ]
 
@@ -176,6 +184,8 @@ def test_report_html_escapes_paper_fields():
             alphaxiv_url="",
             huggingface_url="",
             source_urls=(),
+            alphaxiv_published_at=_DT,
+            huggingface_published_at=_DT,
         )
     ]
 
@@ -203,6 +213,8 @@ def test_report_html_summarizes_totals_in_generated_line():
             alphaxiv_url="",
             huggingface_url="",
             source_urls=(),
+            alphaxiv_published_at=_DT,
+            huggingface_published_at=_DT,
         ),
         ReportRow(
             rank=2,
@@ -219,6 +231,8 @@ def test_report_html_summarizes_totals_in_generated_line():
             alphaxiv_url="",
             huggingface_url="",
             source_urls=(),
+            alphaxiv_published_at=_DT,
+            huggingface_published_at=_DT,
         ),
     ]
 
@@ -248,6 +262,8 @@ def test_report_html_marks_new_papers():
             alphaxiv_url="",
             huggingface_url="",
             source_urls=(),
+            alphaxiv_published_at=_DT,
+            huggingface_published_at=_DT,
             is_new=True,
         ),
         ReportRow(
@@ -265,6 +281,8 @@ def test_report_html_marks_new_papers():
             alphaxiv_url="",
             huggingface_url="",
             source_urls=(),
+            alphaxiv_published_at=_DT,
+            huggingface_published_at=_DT,
             is_new=False,
         ),
     ]
@@ -295,6 +313,8 @@ def test_report_html_links_arxiv_id_to_abs_page():
             alphaxiv_url="https://www.alphaxiv.org/abs/2604.00001",
             huggingface_url="",
             source_urls=(),
+            alphaxiv_published_at=_DT,
+            huggingface_published_at=_DT,
         )
     ]
 
@@ -323,6 +343,8 @@ def test_report_html_places_comments_under_total_score():
             alphaxiv_url="",
             huggingface_url="",
             source_urls=(),
+            alphaxiv_published_at=_DT,
+            huggingface_published_at=_DT,
         )
     ]
 

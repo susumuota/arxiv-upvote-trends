@@ -4,6 +4,7 @@
 import logging
 import os
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import requests
@@ -24,7 +25,6 @@ MAX_POST_LENGTH = 300
 MAX_IMAGE_BYTES = 1_000_000
 # TODO: find the official max alt text length in the AT Protocol spec
 _MAX_ALT_LENGTH = 2_000
-_MIN_TITLE_LENGTH = 12
 logger = logging.getLogger(__name__)
 
 
@@ -68,27 +68,16 @@ def build_bluesky_paper_post(row: ReportRow, total: int) -> TextBuilder:
     title = row.title or row.arxiv_id
     authors = row.authors or ""
 
-    fixed_len = len(header) + 1 + len(row.arxiv_id) + 2 + len(new_prefix)
-    remaining = MAX_POST_LENGTH - fixed_len
+    body = f"{new_prefix}{title}"
     if authors:
-        remaining -= 2
-
-    if len(title) + len(authors) <= remaining:
-        pass
-    elif len(title) <= remaining - _MIN_TITLE_LENGTH and authors:
-        authors = _truncate(authors, remaining - len(title))
-    elif len(title) <= remaining:
-        authors = ""
-    else:
-        title = _truncate(title, remaining)
-        authors = ""
+        body += f"\n\n{authors}"
 
     tb = TextBuilder()
-    tb.text(f"{header}\n")
-    tb.link(row.arxiv_id, row.arxiv_url)
-    tb.text(f"\n\n{new_prefix}{title}")
-    if authors:
-        tb.text(f"\n\n{authors}")
+    tb.text(f"{header}, ")
+    tb.link(f"arXiv:{row.arxiv_id}", row.arxiv_url)
+    tb.text("\n\n")
+    remaining = MAX_POST_LENGTH - len(tb.build_text())
+    tb.text(_truncate(body, remaining))
     return tb
 
 
@@ -124,11 +113,18 @@ def build_bluesky_report_post(rows: list[ReportRow]) -> TextBuilder:
 
 
 def build_bluesky_source_reply(
-    label: str, url: str, score: int, num_comments: int, index: int, total: int
+    label: str,
+    url: str,
+    score: int,
+    num_comments: int,
+    index: int,
+    total: int,
+    published_at: datetime | None = None,
 ) -> TextBuilder:
     """Build a Bluesky reply post linking to a source discussion page."""
     tb = TextBuilder()
-    tb.text(f"({index}/{total}) {score} Upvotes, {num_comments} Comments\n")
+    date_part = f", {published_at.strftime('%d %b %Y')}" if published_at else ""
+    tb.text(f"({index}/{total}) {score} Upvotes, {num_comments} Comments{date_part}, ")
     tb.link(label, url)
     return tb
 

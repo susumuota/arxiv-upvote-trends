@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Susumu Ota
 # SPDX-License-Identifier: MIT
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import ANY, patch
 
@@ -326,6 +327,8 @@ def _row(
         alphaxiv_url=f"https://www.alphaxiv.org/abs/{arxiv_id}",
         huggingface_url=f"https://huggingface.co/papers/{arxiv_id}",
         source_urls=(),
+        alphaxiv_published_at=datetime(2026, 5, 1, tzinfo=UTC),
+        huggingface_published_at=datetime(2026, 5, 2, tzinfo=UTC),
         abstract=abstract,
         is_new=is_new,
     )
@@ -353,13 +356,15 @@ def test_build_bluesky_paper_alt_truncates_long_abstract():
 
 
 def test_build_bluesky_source_reply_includes_stats_and_link():
-    result = build_bluesky_source_reply("Hugging Face", "https://huggingface.co/papers/2604.00001", 5, 3, 1, 2)
+    dt = datetime(2026, 5, 1, tzinfo=UTC)
+    result = build_bluesky_source_reply("Hugging Face", "https://huggingface.co/papers/2604.00001", 5, 3, 1, 2, dt)
 
     assert isinstance(result, TextBuilder)
     text = result.build_text()
     assert "(1/2)" in text
     assert "5 Upvotes" in text
     assert "3 Comments" in text
+    assert "01 May 2026" in text
     assert "Hugging Face" in text
     facets = result.build_facets()
     assert len(facets) == 1
@@ -369,13 +374,31 @@ def test_build_bluesky_source_reply_includes_stats_and_link():
 
 
 def test_build_bluesky_source_reply_with_zero_comments():
-    result = build_bluesky_source_reply("alphaXiv", "https://www.alphaxiv.org/abs/2604.00001", 12, 0, 2, 2)
+    dt = datetime(2026, 4, 20, tzinfo=UTC)
+    result = build_bluesky_source_reply("alphaXiv", "https://www.alphaxiv.org/abs/2604.00001", 12, 0, 2, 2, dt)
 
     text = result.build_text()
     assert "(2/2)" in text
     assert "12 Upvotes" in text
     assert "0 Comments" in text
     assert "alphaXiv" in text
+
+
+def test_build_bluesky_source_reply_includes_published_at():
+    dt = datetime(2026, 5, 7, tzinfo=UTC)
+    result = build_bluesky_source_reply(
+        "Hugging Face",
+        "https://huggingface.co/papers/2604.00001",
+        5,
+        3,
+        1,
+        2,
+        published_at=dt,
+    )
+
+    text = result.build_text()
+    assert "07 May 2026" in text
+    assert text == "(1/2) 5 Upvotes, 3 Comments, 07 May 2026, Hugging Face"
 
 
 def test_build_reply_ref_creates_correct_refs():

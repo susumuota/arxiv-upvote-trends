@@ -107,18 +107,32 @@ def _post_new_papers(report_rows):
             if paper_result is None:
                 continue
             sources = [
-                ("Hugging Face", row.huggingface_url, row.huggingface_score, row.huggingface_comments),
-                ("alphaXiv", row.alphaxiv_url, row.alphaxiv_score, 0),
+                (
+                    "Hugging Face",
+                    row.huggingface_url,
+                    row.huggingface_score,
+                    row.huggingface_comments,
+                    row.huggingface_published_at,
+                ),
+                ("alphaXiv", row.alphaxiv_url, row.alphaxiv_score, 0, row.alphaxiv_published_at),
             ]
             sources.sort(key=lambda s: -s[2])
             parent = paper_result
-            for i, (label, url, score, num_comments) in enumerate(sources):
+            for i, (label, url, score, num_comments, published_at) in enumerate(sources):
                 try:
                     card = fetch_link_card(url)
                 except Exception:
                     logger.warning("Failed to fetch link card for %s", url)
                     card = None
-                reply_text = build_bluesky_source_reply(label, url, score, num_comments, i + 1, len(sources))
+                reply_text = build_bluesky_source_reply(
+                    label,
+                    url,
+                    score,
+                    num_comments,
+                    i + 1,
+                    len(sources),
+                    published_at=published_at,
+                )
                 reply_embed = build_external_embed(
                     url, card.title if card else label, card.description if card else row.title
                 )

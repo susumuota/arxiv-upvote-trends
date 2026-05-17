@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, call
@@ -111,14 +112,14 @@ def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
     ]
     assert post_to_bluesky.call_count == 7
     assert post_to_bluesky.call_args_list[0].args[0].build_text() == (
-        "[3/3] 10 Upvotes, 0 Comments, 1 Posts\n2604.00003\n\n🆕Paper 3"
+        "[3/3] 10 Upvotes, 0 Comments, 1 Posts, arXiv:2604.00003\n\n🆕Paper 3"
     )
     assert post_to_bluesky.call_args_list[0].kwargs == {
         "image_path": Path("reports/2604.00003.png"),
         "image_alt": "First page of arXiv:2604.00003: Paper 3",
     }
     assert post_to_bluesky.call_args_list[3].args[0].build_text() == (
-        "[2/3] 10 Upvotes, 0 Comments, 1 Posts\n2604.00002\n\n🆕Paper 2"
+        "[2/3] 10 Upvotes, 0 Comments, 1 Posts, arXiv:2604.00002\n\n🆕Paper 2"
     )
     assert post_to_bluesky.call_args_list[3].kwargs == {
         "image_path": Path("reports/2604.00002.png"),
@@ -306,6 +307,8 @@ def _report_row(arxiv_id: str, is_new: bool, rank: int = 1) -> SimpleNamespace:
         huggingface_comments=0,
         arxiv_url=f"https://arxiv.org/abs/{arxiv_id}",
         alphaxiv_url=f"https://www.alphaxiv.org/abs/{arxiv_id}",
+        alphaxiv_published_at=datetime(2026, 5, 1, tzinfo=UTC),
         huggingface_url=f"https://huggingface.co/papers/{arxiv_id}",
+        huggingface_published_at=datetime(2026, 5, 2, tzinfo=UTC),
         is_new=is_new,
     )
