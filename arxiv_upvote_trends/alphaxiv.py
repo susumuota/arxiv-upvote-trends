@@ -9,6 +9,7 @@ from itertools import chain
 import requests
 
 from .cache import fallback_cache
+from .dedupe import deduplicate
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,11 @@ def search_alphaxiv(
     """
     total_pages = math.ceil(max_papers / _PAGE_SIZE)
     pages = [_get_alphaxiv(page_num=page_num, interval=interval, wait=wait) for page_num in range(total_pages)]
-    return list(chain.from_iterable(pages))[:max_papers]
+    return deduplicate(chain.from_iterable(pages), key=_paper_id)[:max_papers]
+
+
+def _paper_id(paper: dict) -> str | None:
+    return str(paper.get("universal_paper_id") or "") or None
 
 
 def extract_alphaxiv_stats(paper: dict) -> dict:

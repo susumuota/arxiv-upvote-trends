@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
-from arxiv_upvote_trends.hf import _get_huggingface, extract_huggingface_stats
+from arxiv_upvote_trends.hf import _get_huggingface, extract_huggingface_stats, search_huggingface
 
 
 @dataclass
@@ -42,6 +42,31 @@ def test_respects_wait_parameter(mock_sleep):
     api.list_daily_papers.return_value = []
     _get_huggingface(api, "2026-04-01", wait=2.5)
     mock_sleep.assert_called_once_with(2.5)
+
+
+@patch("arxiv_upvote_trends.hf.HfApi")
+@patch("arxiv_upvote_trends.hf._get_huggingface")
+def test_search_huggingface_deduplicates_papers_before_slicing(mock_get, mock_api):
+    mock_get.side_effect = [
+        [
+            {"id": "2604.00001", "title": "First"},
+            {"id": "2604.00002", "title": "Second"},
+        ],
+        [
+            {"id": "2604.00002", "title": "Second duplicate"},
+            {"id": "2604.00003", "title": "Third"},
+        ],
+    ]
+
+    result = search_huggingface.__wrapped__(max_papers=3, days=2, wait=0)
+
+    assert result == [
+        {"id": "2604.00001", "title": "First"},
+        {"id": "2604.00002", "title": "Second"},
+        {"id": "2604.00003", "title": "Third"},
+    ]
+    assert mock_get.call_count == 2
+    mock_api.assert_called_once_with()
 
 
 def test_extract_huggingface_stats():

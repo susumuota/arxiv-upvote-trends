@@ -53,9 +53,9 @@ def test__get_alphaxiv_raises_on_missing_papers_key(mock_get, mock_sleep):
 @patch("arxiv_upvote_trends.alphaxiv._get_alphaxiv")
 @patch("arxiv_upvote_trends.alphaxiv._PAGE_SIZE", 5)
 def test_search_alphaxiv_single_page(mock_get, tmp_path):
-    mock_get.return_value = [{"id": "1"}, {"id": "2"}]
+    mock_get.return_value = [{"universal_paper_id": "2604.00001"}, {"universal_paper_id": "2604.00002"}]
     result = search_alphaxiv.__wrapped__(max_papers=5, wait=0)
-    assert result == [{"id": "1"}, {"id": "2"}]
+    assert result == [{"universal_paper_id": "2604.00001"}, {"universal_paper_id": "2604.00002"}]
     mock_get.assert_called_once_with(page_num=0, interval="30+Days", wait=0)
 
 
@@ -87,10 +87,37 @@ def test_extract_alphaxiv_stats_missing_fields():
 @patch("arxiv_upvote_trends.alphaxiv._PAGE_SIZE", 2)
 def test_search_alphaxiv_multiple_pages(mock_get, tmp_path):
     mock_get.side_effect = [
-        [{"id": "1"}],
-        [{"id": "2"}],
-        [{"id": "3"}],
+        [{"universal_paper_id": "2604.00001"}],
+        [{"universal_paper_id": "2604.00002"}],
+        [{"universal_paper_id": "2604.00003"}],
     ]
     result = search_alphaxiv.__wrapped__(max_papers=6, wait=0)
-    assert result == [{"id": "1"}, {"id": "2"}, {"id": "3"}]
+    assert result == [
+        {"universal_paper_id": "2604.00001"},
+        {"universal_paper_id": "2604.00002"},
+        {"universal_paper_id": "2604.00003"},
+    ]
     assert mock_get.call_count == 3
+
+
+@patch("arxiv_upvote_trends.alphaxiv._get_alphaxiv")
+@patch("arxiv_upvote_trends.alphaxiv._PAGE_SIZE", 2)
+def test_search_alphaxiv_deduplicates_papers_before_slicing(mock_get, tmp_path):
+    mock_get.side_effect = [
+        [
+            {"universal_paper_id": "2604.00001", "title": "First"},
+            {"universal_paper_id": "2604.00002", "title": "Second"},
+        ],
+        [
+            {"universal_paper_id": "2604.00002", "title": "Second duplicate"},
+            {"universal_paper_id": "2604.00003", "title": "Third"},
+        ],
+    ]
+
+    result = search_alphaxiv.__wrapped__(max_papers=4, wait=0)
+
+    assert result == [
+        {"universal_paper_id": "2604.00001", "title": "First"},
+        {"universal_paper_id": "2604.00002", "title": "Second"},
+        {"universal_paper_id": "2604.00003", "title": "Third"},
+    ]
