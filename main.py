@@ -3,6 +3,7 @@
 
 import logging
 import os
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -15,11 +16,15 @@ from arxiv_upvote_trends import (
     build_bluesky_paper_post,
     build_bluesky_report_alt,
     build_bluesky_report_post,
+    build_bluesky_source_reply,
+    build_external_embed,
+    build_reply_ref,
     build_report_rows,
     capture_arxiv_first_page,
     convert_pdf_to_png,
     extract_alphaxiv_stats,
     extract_huggingface_stats,
+    fetch_link_card,
     is_arxiv_id,
     load_ranking_history,
     post_to_bluesky,
@@ -50,6 +55,7 @@ _SEARCH_DAYS = 30
 _REPORT_LIMIT = 30
 _KNOWN_ID_HOURS = 24
 _REPORT_DPI = 100
+_BLUESKY_POST_WAIT = 1
 
 
 def _search_and_upload(source, search_fn, search_kwargs, upload_path):
@@ -68,12 +74,15 @@ def _try_post_to_bluesky(label, text, **kwargs):
         post_result = post_to_bluesky(text, **kwargs)
     except Exception as e:
         logger.warning("Skipping Bluesky %s after %s.", label, type(e).__name__)
+        return None
     else:
         logger.info("Posted Bluesky %s: uri=%s cid=%s", label, post_result.uri, post_result.cid)
+        return post_result
 
 
 def _post_new_papers(report_rows):
     bluesky_handle = os.environ.get("BLUESKY_HANDLE", "")
+    total = len(report_rows)
     for row in reversed(report_rows):
         if not row.is_new:
             continue
@@ -90,8 +99,40 @@ def _post_new_papers(report_rows):
         logger.info("Captured arXiv first page for %s", row.arxiv_id)
         if bluesky_handle:
             image_alt = build_bluesky_paper_alt(row)
-            post_text = build_bluesky_paper_post(row, total=len(report_rows))
-            _try_post_to_bluesky(f"post for {row.arxiv_id}", post_text, image_path=image_path, image_alt=image_alt)
+            post_text = build_bluesky_paper_post(row, total=total)
+            time.sleep(_BLUESKY_POST_WAIT)
+            paper_result = _try_post_to_bluesky(
+                f"post for {row.arxiv_id}", post_text, image_path=image_path, image_alt=image_alt
+            )
+            if paper_result is None:
+                continue
+            sources = [
+                ("Hugging Face", row.huggingface_url, row.huggingface_score, row.huggingface_comments),
+                ("alphaXiv", row.alphaxiv_url, row.alphaxiv_score, 0),
+            ]
+            sources.sort(key=lambda s: -s[2])
+            parent = paper_result
+            for i, (label, url, score, num_comments) in enumerate(sources):
+                try:
+                    card = fetch_link_card(url)
+                except Exception:
+                    logger.warning("Failed to fetch link card for %s", url)
+                    card = None
+                reply_text = build_bluesky_source_reply(label, url, score, num_comments, i + 1, len(sources))
+                reply_embed = build_external_embed(
+                    url, card.title if card else label, card.description if card else row.title
+                )
+                reply_ref = build_reply_ref(root=paper_result, parent=parent)
+                time.sleep(_BLUESKY_POST_WAIT)
+                result = _try_post_to_bluesky(
+                    f"{label} reply for {row.arxiv_id}",
+                    reply_text,
+                    reply_to=reply_ref,
+                    embed=reply_embed,
+                    thumb=card.thumb if card else None,
+                )
+                if result is not None:
+                    parent = result
 
 
 def _post_report(report_rows):
@@ -110,6 +151,7 @@ def _post_report(report_rows):
     if os.environ.get("BLUESKY_HANDLE", ""):
         report_post_text = build_bluesky_report_post(report_rows)
         report_alt_text = build_bluesky_report_alt(report_rows)
+        time.sleep(_BLUESKY_POST_WAIT)
         _try_post_to_bluesky(
             "top 30 report",
             report_post_text,

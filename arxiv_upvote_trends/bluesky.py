@@ -6,6 +6,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+import requests
 from atproto import Client, models
 from atproto.exceptions import AtProtocolError
 from atproto_client.request import Request
@@ -14,6 +15,7 @@ from PIL import Image
 
 from .report import ReportRow
 
+_CARDYB_URL = "https://cardyb.bsky.app/v1/extract"
 DEFAULT_SERVICE_URL = "https://bsky.social"
 DEFAULT_TIMEOUT = 30
 # https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/feed/post.json
@@ -32,6 +34,31 @@ class BlueskyPostResult:
 
     uri: str
     cid: str
+
+
+@dataclass(frozen=True)
+class LinkCard:
+    """Link card metadata fetched from Bluesky's card service."""
+
+    title: str
+    description: str
+    thumb: bytes | None
+
+
+def fetch_link_card(url: str, timeout: int = DEFAULT_TIMEOUT) -> LinkCard:
+    """Fetch link card metadata and thumbnail from Bluesky's card service."""
+    resp = requests.get(_CARDYB_URL, params={"url": url}, timeout=timeout)
+    resp.raise_for_status()
+    data = resp.json()
+    title = data.get("title", "")
+    description = data.get("description", "")
+    thumb = None
+    image_url = data.get("image", "")
+    if image_url:
+        img_resp = requests.get(image_url, timeout=timeout)
+        img_resp.raise_for_status()
+        thumb = img_resp.content
+    return LinkCard(title=title, description=description, thumb=thumb)
 
 
 def build_bluesky_paper_post(row: ReportRow, total: int) -> TextBuilder:
@@ -96,11 +123,38 @@ def build_bluesky_report_post(rows: list[ReportRow]) -> TextBuilder:
     return tb
 
 
+def build_bluesky_source_reply(
+    label: str, url: str, score: int, num_comments: int, index: int, total: int
+) -> TextBuilder:
+    """Build a Bluesky reply post linking to a source discussion page."""
+    tb = TextBuilder()
+    tb.text(f"({index}/{total}) {score} Upvotes, {num_comments} Comments\n")
+    tb.link(label, url)
+    return tb
+
+
+def build_external_embed(uri: str, title: str, description: str) -> models.AppBskyEmbedExternal.Main:
+    """Build an external link card embed."""
+    return models.AppBskyEmbedExternal.Main(
+        external=models.AppBskyEmbedExternal.External(uri=uri, title=title, description=description)
+    )
+
+
+def build_reply_ref(root: BlueskyPostResult, parent: BlueskyPostResult) -> models.AppBskyFeedPost.ReplyRef:
+    """Build a ReplyRef for threading a reply under a root post."""
+    root_ref = models.ComAtprotoRepoStrongRef.Main(uri=root.uri, cid=root.cid)
+    parent_ref = models.ComAtprotoRepoStrongRef.Main(uri=parent.uri, cid=parent.cid)
+    return models.AppBskyFeedPost.ReplyRef(root=root_ref, parent=parent_ref)
+
+
 def post_to_bluesky(
     text: TextBuilder,
     image_path: Path | None = None,
     image_alt: str = "",
     timeout: int = DEFAULT_TIMEOUT,
+    reply_to: models.AppBskyFeedPost.ReplyRef | None = None,
+    embed: models.AppBskyEmbedImages.Main | models.AppBskyEmbedExternal.Main | None = None,
+    thumb: bytes | None = None,
 ) -> BlueskyPostResult:
     """Post text to Bluesky using an app password."""
     handle = os.environ.get("BLUESKY_HANDLE", "")
@@ -122,10 +176,21 @@ def post_to_bluesky(
         client.login(login=handle, password=app_password)
         logger.info("Logged in to Bluesky")
         phase = "image upload"
-        embed = _build_image_embed(client, image_path, image_alt) if image_path else None
+        if image_path:
+            embed = _build_image_embed(client, image_path, image_alt)
+        elif isinstance(embed, models.AppBskyEmbedExternal.Main) and thumb:
+            blob = client.upload_blob(thumb).blob
+            embed = models.AppBskyEmbedExternal.Main(
+                external=models.AppBskyEmbedExternal.External(
+                    uri=embed.external.uri,
+                    title=embed.external.title,
+                    description=embed.external.description,
+                    thumb=blob,
+                )
+            )
         phase = "post creation"
         logger.info("Sending Bluesky post text_length=%s has_image=%s", len(plain_text), embed is not None)
-        response = client.send_post(text, embed=embed) if embed else client.send_post(text)
+        response = client.send_post(text, reply_to=reply_to, embed=embed)
         logger.info(
             "Sent Bluesky post uri=%s cid=%s",
             str(getattr(response, "uri", "")),

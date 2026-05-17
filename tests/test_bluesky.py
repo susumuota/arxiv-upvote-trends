@@ -15,9 +15,12 @@ from arxiv_upvote_trends.bluesky import (
     DEFAULT_TIMEOUT,
     MAX_IMAGE_BYTES,
     MAX_POST_LENGTH,
+    BlueskyPostResult,
     build_bluesky_paper_alt,
     build_bluesky_paper_post,
     build_bluesky_report_post,
+    build_bluesky_source_reply,
+    build_reply_ref,
     post_to_bluesky,
 )
 from arxiv_upvote_trends.report import ReportRow
@@ -347,3 +350,72 @@ def test_build_bluesky_paper_alt_truncates_long_abstract():
 
     assert len(result) <= 2000
     assert result.endswith("...")
+
+
+def test_build_bluesky_source_reply_includes_stats_and_link():
+    result = build_bluesky_source_reply("Hugging Face", "https://huggingface.co/papers/2604.00001", 5, 3, 1, 2)
+
+    assert isinstance(result, TextBuilder)
+    text = result.build_text()
+    assert "(1/2)" in text
+    assert "5 Upvotes" in text
+    assert "3 Comments" in text
+    assert "Hugging Face" in text
+    facets = result.build_facets()
+    assert len(facets) == 1
+    link = facets[0].features[0]
+    assert isinstance(link, models.AppBskyRichtextFacet.Link)
+    assert link.uri == "https://huggingface.co/papers/2604.00001"
+
+
+def test_build_bluesky_source_reply_with_zero_comments():
+    result = build_bluesky_source_reply("alphaXiv", "https://www.alphaxiv.org/abs/2604.00001", 12, 0, 2, 2)
+
+    text = result.build_text()
+    assert "(2/2)" in text
+    assert "12 Upvotes" in text
+    assert "0 Comments" in text
+    assert "alphaXiv" in text
+
+
+def test_build_reply_ref_creates_correct_refs():
+    root = BlueskyPostResult(uri="at://did/root", cid="cid-root")
+    parent = BlueskyPostResult(uri="at://did/parent", cid="cid-parent")
+
+    ref = build_reply_ref(root, parent)
+
+    assert isinstance(ref, models.AppBskyFeedPost.ReplyRef)
+    assert ref.root.uri == "at://did/root"
+    assert ref.root.cid == "cid-root"
+    assert ref.parent.uri == "at://did/parent"
+    assert ref.parent.cid == "cid-parent"
+
+
+@patch("arxiv_upvote_trends.bluesky.Client")
+def test_post_to_bluesky_passes_reply_to(mock_client_cls, monkeypatch):
+    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    monkeypatch.setenv("BLUESKY_APP_PASSWORD", "app-password")
+    mock_client = mock_client_cls.return_value
+    mock_client.send_post.return_value = SimpleNamespace(uri="at://did/reply", cid="cid-reply")
+    reply_ref = models.AppBskyFeedPost.ReplyRef(
+        root=models.ComAtprotoRepoStrongRef.Main(uri="at://did/root", cid="cid-root"),
+        parent=models.ComAtprotoRepoStrongRef.Main(uri="at://did/parent", cid="cid-parent"),
+    )
+
+    post_to_bluesky(TextBuilder().text("reply"), reply_to=reply_ref)
+
+    _, kwargs = mock_client.send_post.call_args
+    assert kwargs["reply_to"] is reply_ref
+
+
+@patch("arxiv_upvote_trends.bluesky.Client")
+def test_post_to_bluesky_passes_none_reply_to_by_default(mock_client_cls, monkeypatch):
+    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    monkeypatch.setenv("BLUESKY_APP_PASSWORD", "app-password")
+    mock_client = mock_client_cls.return_value
+    mock_client.send_post.return_value = SimpleNamespace(uri="at://did/example", cid="cid-value")
+
+    post_to_bluesky(TextBuilder().text("hello"))
+
+    _, kwargs = mock_client.send_post.call_args
+    assert kwargs["reply_to"] is None

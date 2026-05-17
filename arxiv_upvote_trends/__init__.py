@@ -8,6 +8,10 @@ from .bluesky import (
     build_bluesky_paper_post,
     build_bluesky_report_alt,
     build_bluesky_report_post,
+    build_bluesky_source_reply,
+    build_external_embed,
+    build_reply_ref,
+    fetch_link_card,
     post_to_bluesky,
 )
 from .cache import fallback_cache
@@ -26,6 +30,9 @@ __all__ = [
     "build_bluesky_paper_post",
     "build_bluesky_report_alt",
     "build_bluesky_report_post",
+    "build_bluesky_source_reply",
+    "build_external_embed",
+    "build_reply_ref",
     "build_report_rows",
     "capture_arxiv_first_page",
     "convert_pdf_to_png",
@@ -33,6 +40,7 @@ __all__ = [
     "extract_alphaxiv_stats",
     "extract_huggingface_stats",
     "fallback_cache",
+    "fetch_link_card",
     "is_arxiv_id",
     "load_ranking_history",
     "post_to_bluesky",

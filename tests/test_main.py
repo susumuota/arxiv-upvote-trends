@@ -11,6 +11,9 @@ from atproto import models
 from atproto_client.utils.text_builder import TextBuilder
 
 import main as main_module
+from arxiv_upvote_trends.bluesky import LinkCard
+
+_STUB_LINK_CARD = LinkCard(title="Page Title", description="Page description", thumb=b"fake-image")
 
 
 def test_main_skips_bluesky_when_handle_is_empty(monkeypatch):
@@ -106,7 +109,7 @@ def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
         call("2604.00003", Path("reports/2604.00003.png"), max_output_bytes=main_module.MAX_IMAGE_BYTES),
         call("2604.00002", Path("reports/2604.00002.png"), max_output_bytes=main_module.MAX_IMAGE_BYTES),
     ]
-    assert post_to_bluesky.call_count == 3
+    assert post_to_bluesky.call_count == 7
     assert post_to_bluesky.call_args_list[0].args[0].build_text() == (
         "[3/3] 10 Upvotes, 0 Comments, 1 Posts\n2604.00003\n\n🆕Paper 3"
     )
@@ -114,14 +117,14 @@ def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
         "image_path": Path("reports/2604.00003.png"),
         "image_alt": "First page of arXiv:2604.00003: Paper 3",
     }
-    assert post_to_bluesky.call_args_list[1].args[0].build_text() == (
+    assert post_to_bluesky.call_args_list[3].args[0].build_text() == (
         "[2/3] 10 Upvotes, 0 Comments, 1 Posts\n2604.00002\n\n🆕Paper 2"
     )
-    assert post_to_bluesky.call_args_list[1].kwargs == {
+    assert post_to_bluesky.call_args_list[3].kwargs == {
         "image_path": Path("reports/2604.00002.png"),
         "image_alt": "First page of arXiv:2604.00002: Paper 2",
     }
-    report_arg = post_to_bluesky.call_args_list[2].args[0]
+    report_arg = post_to_bluesky.call_args_list[6].args[0]
     assert isinstance(report_arg, TextBuilder)
     assert report_arg.build_text() == "arXiv Upvote Trends Top 30\n[1/3] [2/3] [3/3]"
     facets = report_arg.build_facets()
@@ -131,7 +134,7 @@ def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
     assert links[0].uri == "https://arxiv.org/abs/2604.00001"
     assert links[1].uri == "https://arxiv.org/abs/2604.00002"
     assert links[2].uri == "https://arxiv.org/abs/2604.00003"
-    assert post_to_bluesky.call_args_list[2].kwargs == {
+    assert post_to_bluesky.call_args_list[6].kwargs == {
         "image_path": Path("reports/top30.png"),
         "image_alt": (
             "1/3 https://arxiv.org/abs/2604.00001\n"
@@ -191,6 +194,67 @@ def test_main_captures_first_pages_only_for_new_report_rows(monkeypatch):
     ]
 
 
+def test_main_posts_reply_thread_ordered_by_score(monkeypatch):
+    _set_base_config(monkeypatch)
+    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    paper_result = Mock(uri="at://did/paper", cid="cid-paper")
+    hf_result = Mock(uri="at://did/hf", cid="cid-hf")
+    ax_result = Mock(uri="at://did/ax", cid="cid-ax")
+    report_result = Mock(uri="at://did/report", cid="cid-report")
+    post_to_bluesky = Mock(side_effect=[paper_result, hf_result, ax_result, report_result])
+    monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
+    row = _report_row("2604.00001", is_new=True)
+    row.huggingface_score = 20
+    row.alphaxiv_score = 8
+    row.huggingface_comments = 3
+    mocks = _stub_pipeline(monkeypatch)
+    mocks["build_report_rows"].return_value = [row]
+    mocks["capture_arxiv_first_page"].return_value = Path("reports/2604.00001.png")
+
+    main_module.main()
+
+    assert post_to_bluesky.call_count == 4
+    hf_call = post_to_bluesky.call_args_list[1]
+    assert "Hugging Face" in hf_call.args[0].build_text()
+    assert "(1/2)" in hf_call.args[0].build_text()
+    assert "20 Upvotes" in hf_call.args[0].build_text()
+    assert "3 Comments" in hf_call.args[0].build_text()
+    hf_ref = hf_call.kwargs["reply_to"]
+    assert hf_ref.root.uri == "at://did/paper"
+    assert hf_ref.parent.uri == "at://did/paper"
+    ax_call = post_to_bluesky.call_args_list[2]
+    assert "alphaXiv" in ax_call.args[0].build_text()
+    assert "(2/2)" in ax_call.args[0].build_text()
+    assert "8 Upvotes" in ax_call.args[0].build_text()
+    ax_ref = ax_call.kwargs["reply_to"]
+    assert ax_ref.root.uri == "at://did/paper"
+    assert ax_ref.parent.uri == "at://did/hf"
+
+
+def test_main_posts_alphaxiv_reply_under_paper_when_hf_reply_fails(monkeypatch):
+    _set_base_config(monkeypatch)
+    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    paper_result = Mock(uri="at://did/paper", cid="cid-paper")
+    ax_result = Mock(uri="at://did/ax", cid="cid-ax")
+    report_result = Mock(uri="at://did/report", cid="cid-report")
+    post_to_bluesky = Mock(side_effect=[paper_result, RuntimeError("hf failed"), ax_result, report_result])
+    monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
+    row = _report_row("2604.00001", is_new=True)
+    row.huggingface_score = 20
+    row.alphaxiv_score = 8
+    mocks = _stub_pipeline(monkeypatch)
+    mocks["build_report_rows"].return_value = [row]
+    mocks["capture_arxiv_first_page"].return_value = Path("reports/2604.00001.png")
+
+    main_module.main()
+
+    assert post_to_bluesky.call_count == 4
+    ax_call = post_to_bluesky.call_args_list[2]
+    ax_ref = ax_call.kwargs["reply_to"]
+    assert ax_ref.root.uri == "at://did/paper"
+    assert ax_ref.parent.uri == "at://did/paper"
+
+
 def _set_base_config(monkeypatch):
     monkeypatch.setattr(main_module, "GCS_BUCKET", "")
     monkeypatch.setattr(main_module, "HF_REPO_ID", "")
@@ -219,6 +283,7 @@ def _stub_pipeline(monkeypatch, stats: pd.DataFrame | None = None) -> dict[str, 
     monkeypatch.setattr(main_module, "convert_pdf_to_png", mocks["convert_pdf_to_png"])
     monkeypatch.setattr(main_module, "render_report_html", mocks["render_report_html"])
     monkeypatch.setattr(main_module, "render_report_pdf", mocks["render_report_pdf"])
+    monkeypatch.setattr(main_module, "fetch_link_card", Mock(return_value=_STUB_LINK_CARD))
     return mocks
 
 
@@ -236,6 +301,11 @@ def _report_row(arxiv_id: str, is_new: bool, rank: int = 1) -> SimpleNamespace:
         score=10,
         num_comments=0,
         count=1,
+        alphaxiv_score=5,
+        huggingface_score=5,
+        huggingface_comments=0,
         arxiv_url=f"https://arxiv.org/abs/{arxiv_id}",
+        alphaxiv_url=f"https://www.alphaxiv.org/abs/{arxiv_id}",
+        huggingface_url=f"https://huggingface.co/papers/{arxiv_id}",
         is_new=is_new,
     )
