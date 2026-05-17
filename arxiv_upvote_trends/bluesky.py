@@ -34,13 +34,35 @@ class BlueskyPostResult:
     cid: str
 
 
-def build_bluesky_paper_post(row: ReportRow) -> TextBuilder:
+def build_bluesky_paper_post(row: ReportRow, total: int) -> TextBuilder:
     """Build one Bluesky post for a newly ranked paper."""
-    for title_length in range(180, _MIN_TITLE_LENGTH - 1, -8):
-        text = _format_paper_post(row, title_length)
-        if len(text) <= MAX_POST_LENGTH:
-            return TextBuilder().text(text)
-    return TextBuilder().text(_truncate(_format_paper_post(row, _MIN_TITLE_LENGTH), MAX_POST_LENGTH))
+    header = f"[{row.rank}/{total}] {row.score} Upvotes, {row.num_comments} Comments, {row.count} Posts"
+    new_prefix = "🆕" if row.is_new else ""
+    title = row.title or row.arxiv_id
+    authors = row.authors or ""
+
+    fixed_len = len(header) + 1 + len(row.arxiv_id) + 2 + len(new_prefix)
+    remaining = MAX_POST_LENGTH - fixed_len
+    if authors:
+        remaining -= 2
+
+    if len(title) + len(authors) <= remaining:
+        pass
+    elif len(title) <= remaining - _MIN_TITLE_LENGTH and authors:
+        authors = _truncate(authors, remaining - len(title))
+    elif len(title) <= remaining:
+        authors = ""
+    else:
+        title = _truncate(title, remaining)
+        authors = ""
+
+    tb = TextBuilder()
+    tb.text(f"{header}\n")
+    tb.link(row.arxiv_id, row.arxiv_url)
+    tb.text(f"\n\n{new_prefix}{title}")
+    if authors:
+        tb.text(f"\n\n{authors}")
+    return tb
 
 
 def build_bluesky_report_alt(rows: list[ReportRow]) -> str:
@@ -128,17 +150,6 @@ def _build_image_embed(client: Client, image_path: Path, image_alt: str) -> mode
         aspect_ratio=models.AppBskyEmbedDefs.AspectRatio(width=width, height=height),
     )
     return models.AppBskyEmbedImages.Main(images=[image])
-
-
-def _format_paper_post(row: ReportRow, title_length: int) -> str:
-    title = _truncate(row.title or row.arxiv_id, title_length)
-    parts = [
-        "New arXiv Upvote Trends paper",
-        f"Rank {row.rank}: {title}",
-        f"{row.score:,} pts",
-        row.arxiv_url,
-    ]
-    return "\n".join(part for part in parts if part)
 
 
 def _truncate(text: str, max_length: int) -> str:

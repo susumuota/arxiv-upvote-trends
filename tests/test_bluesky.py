@@ -25,15 +25,22 @@ from arxiv_upvote_trends.report import ReportRow
 def test_build_bluesky_paper_post_includes_row_details_and_url():
     row = _row(rank=2, arxiv_id="2604.00002", title="Second paper", score=45)
 
-    result = build_bluesky_paper_post(row)
+    result = build_bluesky_paper_post(row, 10)
 
     assert isinstance(result, TextBuilder)
     text = result.build_text()
     assert len(text) <= MAX_POST_LENGTH
-    assert "New arXiv Upvote Trends paper" in text
-    assert "Rank 2: Second paper" in text
-    assert "45 pts" in text
-    assert "https://arxiv.org/abs/2604.00002" in text
+    assert "[2/10]" in text
+    assert "45 Upvotes" in text
+    assert "0 Comments" in text
+    assert "1 Posts" in text
+    assert "2604.00002" in text
+    assert "Second paper" in text
+    facets = result.build_facets()
+    assert len(facets) == 1
+    link = facets[0].features[0]
+    assert isinstance(link, models.AppBskyRichtextFacet.Link)
+    assert link.uri == "https://arxiv.org/abs/2604.00002"
 
 
 def test_build_bluesky_paper_post_truncates_long_titles():
@@ -44,12 +51,29 @@ def test_build_bluesky_paper_post_truncates_long_titles():
         score=123,
     )
 
-    result = build_bluesky_paper_post(row)
+    result = build_bluesky_paper_post(row, 10)
 
     text = result.build_text()
     assert len(text) <= MAX_POST_LENGTH
     assert "..." in text
-    assert "https://arxiv.org/abs/2604.00001" in text
+    assert "2604.00001" in text
+
+
+def test_build_bluesky_paper_post_includes_authors():
+    row = _row(rank=1, arxiv_id="2604.00001", title="Paper", score=10, authors="Alice, Bob")
+
+    result = build_bluesky_paper_post(row, 5)
+
+    text = result.build_text()
+    assert "Alice, Bob" in text
+
+
+def test_build_bluesky_paper_post_shows_new_emoji_only_when_new():
+    row_new = _row(rank=1, arxiv_id="2604.00001", title="Paper", score=10, is_new=True)
+    row_old = _row(rank=1, arxiv_id="2604.00001", title="Paper", score=10, is_new=False)
+
+    assert "🆕" in build_bluesky_paper_post(row_new, 5).build_text()
+    assert "🆕" not in build_bluesky_paper_post(row_old, 5).build_text()
 
 
 def test_build_bluesky_report_post_includes_linked_indices():
@@ -273,12 +297,12 @@ def test_post_to_bluesky_sanitizes_send_post_errors(mock_client_cls, monkeypatch
     assert exc_info.value.__cause__ is None
 
 
-def _row(rank: int, arxiv_id: str, title: str, score: int) -> ReportRow:
+def _row(rank: int, arxiv_id: str, title: str, score: int, *, authors: str = "", is_new: bool = True) -> ReportRow:
     return ReportRow(
         rank=rank,
         arxiv_id=arxiv_id,
         title=title,
-        authors="",
+        authors=authors,
         score=score,
         num_comments=0,
         count=1,
@@ -289,4 +313,5 @@ def _row(rank: int, arxiv_id: str, title: str, score: int) -> ReportRow:
         alphaxiv_url=f"https://www.alphaxiv.org/abs/{arxiv_id}",
         huggingface_url=f"https://huggingface.co/papers/{arxiv_id}",
         source_urls=(),
+        is_new=is_new,
     )

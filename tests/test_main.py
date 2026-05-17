@@ -108,14 +108,14 @@ def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
     ]
     assert post_to_bluesky.call_count == 3
     assert post_to_bluesky.call_args_list[0].args[0].build_text() == (
-        "New arXiv Upvote Trends paper\nRank 3: Paper 3\n10 pts\nhttps://arxiv.org/abs/2604.00003"
+        "[3/3] 10 Upvotes, 0 Comments, 1 Posts\n2604.00003\n\n🆕Paper 3"
     )
     assert post_to_bluesky.call_args_list[0].kwargs == {
         "image_path": Path("reports/2604.00003.png"),
         "image_alt": "First page of arXiv:2604.00003: Paper 3",
     }
     assert post_to_bluesky.call_args_list[1].args[0].build_text() == (
-        "New arXiv Upvote Trends paper\nRank 2: Paper 2\n10 pts\nhttps://arxiv.org/abs/2604.00002"
+        "[2/3] 10 Upvotes, 0 Comments, 1 Posts\n2604.00002\n\n🆕Paper 2"
     )
     assert post_to_bluesky.call_args_list[1].kwargs == {
         "image_path": Path("reports/2604.00002.png"),
@@ -231,8 +231,10 @@ def _report_row(arxiv_id: str, is_new: bool, rank: int = 1) -> SimpleNamespace:
         rank=rank,
         arxiv_id=arxiv_id,
         title=f"Paper {rank}",
+        authors="",
         score=10,
         num_comments=0,
+        count=1,
         arxiv_url=f"https://arxiv.org/abs/{arxiv_id}",
         is_new=is_new,
     )
