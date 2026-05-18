@@ -96,6 +96,18 @@ def build_bluesky_paper_alt(row: ReportRow) -> str:
     return _truncate(f"First page of arXiv:{row.arxiv_id}: {title}", _MAX_ALT_LENGTH)
 
 
+def build_bluesky_translation_post(translated_abstract: str) -> TextBuilder:
+    """Build a Bluesky reply post from a Japanese abstract translation."""
+    tb = TextBuilder()
+    tb.text(_truncate(translated_abstract, MAX_POST_LENGTH))
+    return tb
+
+
+def build_bluesky_translation_alt(translated_abstract: str) -> str:
+    """Build alt text from a Japanese abstract translation."""
+    return _truncate(translated_abstract, _MAX_ALT_LENGTH)
+
+
 def build_bluesky_report_post(rows: list[ReportRow]) -> TextBuilder:
     """Build one Bluesky post for the top report image."""
     tb = TextBuilder()

@@ -13,6 +13,7 @@ from arxiv_upvote_trends.report import (
     build_report_rows,
     convert_pdf_to_png,
     render_report_html,
+    render_translation_html,
     report_html,
 )
 
@@ -320,6 +321,34 @@ def test_render_report_html_writes_file(tmp_path):
 
     assert result == output_path
     assert "arXiv Upvote Trends Top 0" in output_path.read_text(encoding="utf-8")
+
+
+def test_render_translation_html_writes_file(tmp_path):
+    output_path = tmp_path / "translation.html"
+    row = ReportRow(
+        rank=1,
+        arxiv_id="2604.00001",
+        title="Paper title",
+        authors="Alice",
+        score=10,
+        num_comments=1,
+        count=1,
+        arxiv_url="https://arxiv.org/abs/2604.00001",
+        sources=(),
+    )
+
+    result = render_translation_html(
+        row,
+        "これは日本語の要約です。",
+        output_path,
+        generated_at=datetime(2026, 4, 23, 0, 0, tzinfo=UTC),
+    )
+
+    html = output_path.read_text(encoding="utf-8")
+    assert result == output_path
+    assert '<html lang="ja">' in html
+    assert "Paper title" in html
+    assert "これは日本語の要約です。" in html
 
 
 def _sources(

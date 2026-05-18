@@ -10,7 +10,7 @@ import joblib
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_CACHE_DIR = "./persistent_data"
+_DEFAULT_CACHE_DIR = "./persistent_data/fallback_cache"
 P = ParamSpec("P")
 R = TypeVar("R")
 

@@ -67,6 +67,19 @@ BLUESKY_SERVICE_URL=https://bsky.social
 
 If `BLUESKY_HANDLE` is empty or unset, the job skips posting.
 
+### DeepL abstract translations (optional)
+
+Setup steps for adding a Japanese abstract translation image to each new paper's Bluesky thread. The image is posted
+after all source replies. For local runs, set the DeepL authentication key in `.env`. For Cloud Run Jobs, store it in
+Secret Manager and inject it as `DEEPL_AUTH_KEY`.
+
+```bash
+DEEPL_AUTH_KEY=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
+Translation results are cached in `persistent_data/deepl_translate`, persisted through the same GCS archive as the other
+job data, and pruned after about 60 days. If `DEEPL_AUTH_KEY` is empty or unset, the job skips translation images.
+
 ### GCS bucket (optional)
 
 Setup steps for using a GCS bucket to persist `persistent_data`. If not needed, disable it with `unset GCS_BUCKET`.
@@ -234,6 +247,10 @@ echo -n "$BLUESKY_APP_PASSWORD" | gcloud secrets create BLUESKY_APP_PASSWORD \
     --data-file=- \
     --project="$GOOGLE_CLOUD_PROJECT"
 
+echo -n "$DEEPL_AUTH_KEY" | gcloud secrets create DEEPL_AUTH_KEY \
+    --data-file=- \
+    --project="$GOOGLE_CLOUD_PROJECT"
+
 gcloud secrets add-iam-policy-binding HF_TOKEN \
     --member="serviceAccount:${SA_NAME}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
     --role="roles/secretmanager.secretAccessor" \
@@ -244,9 +261,16 @@ gcloud secrets add-iam-policy-binding BLUESKY_APP_PASSWORD \
     --role="roles/secretmanager.secretAccessor" \
     --project="$GOOGLE_CLOUD_PROJECT"
 
+gcloud secrets add-iam-policy-binding DEEPL_AUTH_KEY \
+    --member="serviceAccount:${SA_NAME}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+    --role="roles/secretmanager.secretAccessor" \
+    --project="$GOOGLE_CLOUD_PROJECT"
+
 gcloud secrets describe HF_TOKEN --project="$GOOGLE_CLOUD_PROJECT"
 
 gcloud secrets describe BLUESKY_APP_PASSWORD --project="$GOOGLE_CLOUD_PROJECT"
+
+gcloud secrets describe DEEPL_AUTH_KEY --project="$GOOGLE_CLOUD_PROJECT"
 
 gcloud services enable run.googleapis.com --project="$GOOGLE_CLOUD_PROJECT"
 
@@ -256,7 +280,7 @@ gcloud run jobs create "$JOB_NAME" \
     --project="$GOOGLE_CLOUD_PROJECT" \
     --service-account="${SA_NAME}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
     --set-env-vars="GCS_BUCKET=${GCS_BUCKET},HF_REPO_ID=${HF_REPO_ID},BLUESKY_HANDLE=${BLUESKY_HANDLE},BLUESKY_SERVICE_URL=${BLUESKY_SERVICE_URL}" \
-    --set-secrets="HF_TOKEN=HF_TOKEN:latest,BLUESKY_APP_PASSWORD=BLUESKY_APP_PASSWORD:latest" \
+    --set-secrets="HF_TOKEN=HF_TOKEN:latest,BLUESKY_APP_PASSWORD=BLUESKY_APP_PASSWORD:latest,DEEPL_AUTH_KEY=DEEPL_AUTH_KEY:latest" \
     --max-retries=0 \
     --task-timeout=30m \
     --memory=2048Mi

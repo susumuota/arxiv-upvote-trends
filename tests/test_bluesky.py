@@ -21,6 +21,8 @@ from arxiv_upvote_trends.bluesky import (
     build_bluesky_paper_post,
     build_bluesky_report_post,
     build_bluesky_source_reply,
+    build_bluesky_translation_alt,
+    build_bluesky_translation_post,
     build_reply_ref,
     post_to_bluesky,
 )
@@ -356,6 +358,27 @@ def test_build_bluesky_paper_alt_truncates_long_abstract():
     row = _row(rank=1, arxiv_id="2604.00001", title="Title", score=10, abstract="x" * 3000)
 
     result = build_bluesky_paper_alt(row)
+
+    assert len(result) <= 2000
+    assert result.endswith("...")
+
+
+def test_build_bluesky_translation_post_uses_translated_abstract():
+    result = build_bluesky_translation_post("日本語の要約")
+
+    text = result.build_text()
+    assert len(text) <= MAX_POST_LENGTH
+    assert text == "日本語の要約"
+
+
+def test_build_bluesky_translation_alt_uses_translated_abstract():
+    result = build_bluesky_translation_alt("日本語の要約")
+
+    assert result == "日本語の要約"
+
+
+def test_build_bluesky_translation_alt_truncates_long_text():
+    result = build_bluesky_translation_alt("あ" * 3000)
 
     assert len(result) <= 2000
     assert result.endswith("...")

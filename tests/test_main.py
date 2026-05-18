@@ -254,6 +254,79 @@ def test_main_posts_alphaxiv_reply_under_paper_when_hf_reply_fails(monkeypatch):
     assert ax_ref.parent.uri == "at://did/paper"
 
 
+def test_main_posts_japanese_translation_after_source_replies(monkeypatch):
+    _set_base_config(monkeypatch)
+    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    paper_result = Mock(uri="at://did/paper", cid="cid-paper")
+    hf_result = Mock(uri="at://did/hf", cid="cid-hf")
+    ax_result = Mock(uri="at://did/ax", cid="cid-ax")
+    translation_result = Mock(uri="at://did/translation", cid="cid-translation")
+    report_result = Mock(uri="at://did/report", cid="cid-report")
+    post_to_bluesky = Mock(side_effect=[paper_result, hf_result, ax_result, translation_result, report_result])
+    monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
+    row = _report_row("2604.00001", is_new=True, abstract="English abstract")
+    row.sources = _sources("2604.00001", ax_score=8, hf_score=20, hf_comments=3)
+    mocks = _stub_pipeline(monkeypatch)
+    mocks["build_report_rows"].return_value = [row]
+    mocks["capture_arxiv_first_page"].return_value = Path("reports/2604.00001.png")
+    mocks["translate_abstract_to_japanese"].return_value = "日本語の要約"
+    mocks["render_translation_html"].return_value = Path("reports/2604.00001-ja-abstract.html")
+    mocks["render_report_pdf"].side_effect = [
+        Path("reports/2604.00001-ja-abstract.pdf"),
+        Path("reports/top30.pdf"),
+    ]
+    mocks["convert_pdf_to_png"].side_effect = [
+        Path("reports/2604.00001-ja-abstract.png"),
+        Path("reports/top30.png"),
+    ]
+
+    main_module.main()
+
+    assert post_to_bluesky.call_count == 5
+    mocks["translate_abstract_to_japanese"].assert_called_once_with("2604.00001", "English abstract")
+    translation_call = post_to_bluesky.call_args_list[3]
+    assert translation_call.args[0].build_text() == "日本語の要約"
+    assert translation_call.kwargs["image_path"] == Path("reports/2604.00001-ja-abstract.png")
+    assert translation_call.kwargs["image_alt"] == "日本語の要約"
+    translation_ref = translation_call.kwargs["reply_to"]
+    assert translation_ref.root.uri == "at://did/paper"
+    assert translation_ref.parent.uri == "at://did/ax"
+
+
+def test_main_skips_japanese_translation_when_abstract_is_empty(monkeypatch):
+    _set_base_config(monkeypatch)
+    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    post_to_bluesky = Mock(return_value=Mock(uri="at://did/example", cid="cid-value"))
+    monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
+    row = _report_row("2604.00001", is_new=True, abstract="")
+    mocks = _stub_pipeline(monkeypatch)
+    mocks["build_report_rows"].return_value = [row]
+    mocks["capture_arxiv_first_page"].return_value = Path("reports/2604.00001.png")
+
+    main_module.main()
+
+    mocks["translate_abstract_to_japanese"].assert_not_called()
+
+
+def test_main_continues_when_japanese_translation_fails(monkeypatch, caplog):
+    _set_base_config(monkeypatch)
+    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    post_to_bluesky = Mock(return_value=Mock(uri="at://did/example", cid="cid-value"))
+    monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
+    row = _report_row("2604.00001", is_new=True, abstract="English abstract")
+    mocks = _stub_pipeline(monkeypatch)
+    mocks["build_report_rows"].return_value = [row]
+    mocks["capture_arxiv_first_page"].return_value = Path("reports/2604.00001.png")
+    mocks["translate_abstract_to_japanese"].side_effect = RuntimeError("deepl failed")
+
+    with caplog.at_level(logging.WARNING):
+        main_module.main()
+
+    assert "Skipping Japanese abstract reply for 2604.00001 after RuntimeError." in caplog.text
+    report_arg = post_to_bluesky.call_args_list[-1].args[0]
+    assert report_arg.build_text() == "arXiv Upvote Trends Top 30\n[1/1]"
+
+
 def _set_base_config(monkeypatch):
     monkeypatch.setattr(main_module, "GCS_BUCKET", "")
     monkeypatch.setattr(main_module, "HF_REPO_ID", "")
@@ -265,8 +338,11 @@ def _stub_pipeline(monkeypatch, stats: pd.DataFrame | None = None) -> dict[str, 
         "build_report_rows": Mock(return_value=[]),
         "capture_arxiv_first_page": Mock(),
         "convert_pdf_to_png": Mock(return_value=Path("reports/top30.png")),
+        "prune_deepl_translation_cache": Mock(),
         "render_report_html": Mock(return_value=Path("reports/top30.html")),
         "render_report_pdf": Mock(return_value=Path("reports/top30.pdf")),
+        "render_translation_html": Mock(return_value=Path("reports/2604.00001-ja-abstract.html")),
+        "translate_abstract_to_japanese": Mock(return_value=None),
     }
     monkeypatch.setattr(main_module, "search_alphaxiv", Mock(return_value=[]))
     monkeypatch.setattr(main_module, "search_huggingface", Mock(return_value=[]))
@@ -280,8 +356,11 @@ def _stub_pipeline(monkeypatch, stats: pd.DataFrame | None = None) -> dict[str, 
     monkeypatch.setattr(main_module, "build_report_rows", mocks["build_report_rows"])
     monkeypatch.setattr(main_module, "capture_arxiv_first_page", mocks["capture_arxiv_first_page"])
     monkeypatch.setattr(main_module, "convert_pdf_to_png", mocks["convert_pdf_to_png"])
+    monkeypatch.setattr(main_module, "prune_deepl_translation_cache", mocks["prune_deepl_translation_cache"])
     monkeypatch.setattr(main_module, "render_report_html", mocks["render_report_html"])
     monkeypatch.setattr(main_module, "render_report_pdf", mocks["render_report_pdf"])
+    monkeypatch.setattr(main_module, "render_translation_html", mocks["render_translation_html"])
+    monkeypatch.setattr(main_module, "translate_abstract_to_japanese", mocks["translate_abstract_to_japanese"])
     monkeypatch.setattr(main_module, "fetch_link_card", Mock(return_value=_STUB_LINK_CARD))
     return mocks
 
@@ -290,13 +369,13 @@ def _empty_stats() -> pd.DataFrame:
     return pd.DataFrame(columns=["arxiv_id", "score", "num_comments", "count", "url"])
 
 
-def _report_row(arxiv_id: str, is_new: bool, rank: int = 1) -> SimpleNamespace:
+def _report_row(arxiv_id: str, is_new: bool, rank: int = 1, abstract: str = "") -> SimpleNamespace:
     return SimpleNamespace(
         rank=rank,
         arxiv_id=arxiv_id,
         title=f"Paper {rank}",
         authors="",
-        abstract="",
+        abstract=abstract,
         score=10,
         num_comments=0,
         count=1,

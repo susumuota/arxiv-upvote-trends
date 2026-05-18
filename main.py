@@ -17,6 +17,8 @@ from arxiv_upvote_trends import (
     build_bluesky_report_alt,
     build_bluesky_report_post,
     build_bluesky_source_reply,
+    build_bluesky_translation_alt,
+    build_bluesky_translation_post,
     build_external_embed,
     build_reply_ref,
     build_report_rows,
@@ -28,12 +30,15 @@ from arxiv_upvote_trends import (
     is_arxiv_id,
     load_ranking_history,
     post_to_bluesky,
+    prune_deepl_translation_cache,
     render_report_html,
     render_report_pdf,
+    render_translation_html,
     restore_dir,
     save_dir,
     search_alphaxiv,
     search_huggingface,
+    translate_abstract_to_japanese,
     update_ranking_history,
     upload_papers,
 )
@@ -55,18 +60,16 @@ _SEARCH_DAYS = 30
 _REPORT_LIMIT = 30
 _KNOWN_ID_HOURS = 24
 _REPORT_DPI = 100
+_TRANSLATION_DPI = 100
 _BLUESKY_POST_WAIT = 1
 
 
-def _search_and_upload(source, search_fn, search_kwargs, upload_path):
-    logger.info("Searching %s papers", source)
-    papers = search_fn(**search_kwargs)
-    logger.info("Fetched %s papers", len(papers))
-    if HF_REPO_ID:
-        logger.info("Uploading %s papers to Hugging Face Dataset", source)
-        upload_papers(papers, HF_REPO_ID, upload_path)
-        logger.info("Uploaded %s papers to Hugging Face Dataset", source)
-    return papers
+def _upload_papers_if_configured(source, papers, upload_path):
+    if not HF_REPO_ID:
+        return
+    logger.info("Uploading %s papers to Hugging Face Dataset", source)
+    upload_papers(papers, HF_REPO_ID, upload_path)
+    logger.info("Uploaded %s papers to Hugging Face Dataset", source)
 
 
 def _try_post_to_bluesky(label, text, **kwargs):
@@ -78,6 +81,46 @@ def _try_post_to_bluesky(label, text, **kwargs):
     else:
         logger.info("Posted Bluesky %s: uri=%s cid=%s", label, post_result.uri, post_result.cid)
         return post_result
+
+
+def _post_translation_reply(row, paper_result, parent):
+    if not row.abstract.strip():
+        return parent
+    try:
+        translated_abstract = translate_abstract_to_japanese(row.arxiv_id, row.abstract)
+        if not translated_abstract:
+            return parent
+        logger.info("Rendering Japanese abstract translation HTML for %s", row.arxiv_id)
+        html_path = render_translation_html(
+            row,
+            translated_abstract,
+            Path(f"reports/{row.arxiv_id}-ja-abstract.html"),
+        )
+        logger.info("Rendering Japanese abstract translation PDF for %s", row.arxiv_id)
+        pdf_path = render_report_pdf(html_path, Path(f"reports/{row.arxiv_id}-ja-abstract.pdf"))
+        logger.info("Converting Japanese abstract translation PDF to PNG for %s", row.arxiv_id)
+        image_path = convert_pdf_to_png(
+            pdf_path,
+            Path(f"reports/{row.arxiv_id}-ja-abstract.png"),
+            _TRANSLATION_DPI,
+            MAX_IMAGE_BYTES,
+        )
+    except Exception as e:
+        logger.warning("Skipping Japanese abstract reply for %s after %s.", row.arxiv_id, type(e).__name__)
+        return parent
+
+    reply_ref = build_reply_ref(root=paper_result, parent=parent)
+    post_text = build_bluesky_translation_post(translated_abstract)
+    image_alt = build_bluesky_translation_alt(translated_abstract)
+    time.sleep(_BLUESKY_POST_WAIT)
+    result = _try_post_to_bluesky(
+        f"Japanese abstract reply for {row.arxiv_id}",
+        post_text,
+        image_path=image_path,
+        image_alt=image_alt,
+        reply_to=reply_ref,
+    )
+    return result if result is not None else parent
 
 
 def _post_new_papers(report_rows):
@@ -137,6 +180,7 @@ def _post_new_papers(report_rows):
                 )
                 if result is not None:
                     parent = result
+            _post_translation_reply(row, paper_result, parent)
 
 
 def _post_report(report_rows):
@@ -171,18 +215,19 @@ def main():
         restore_dir(GCS_BUCKET, "persistent_data.tar.gz", "./persistent_data")
         logger.info("Restored persistent data from GCS")
 
-    ax_papers = _search_and_upload(
-        "alphaXiv",
-        search_alphaxiv,
-        {"max_papers": _MAX_PAPERS, "interval": "30+Days", "wait": 1},
-        "raw/alphaxiv.jsonl",
-    )
-    hf_papers = _search_and_upload(
-        "Hugging Face",
-        search_huggingface,
-        {"max_papers": _MAX_PAPERS, "days": _SEARCH_DAYS, "wait": 1},
-        "raw/huggingface.jsonl",
-    )
+    logger.info("Pruning DeepL translation cache")
+    prune_deepl_translation_cache()
+    logger.info("Pruned DeepL translation cache")
+
+    logger.info("Searching alphaXiv papers")
+    ax_papers = search_alphaxiv(_MAX_PAPERS, interval="30+Days", wait=1)
+    logger.info("Fetched %s alphaXiv papers", len(ax_papers))
+    _upload_papers_if_configured("alphaXiv", ax_papers, "raw/alphaxiv.jsonl")
+
+    logger.info("Searching Hugging Face papers")
+    hf_papers = search_huggingface(_MAX_PAPERS, days=_SEARCH_DAYS, wait=1)
+    logger.info("Fetched %s Hugging Face papers", len(hf_papers))
+    _upload_papers_if_configured("Hugging Face", hf_papers, "raw/huggingface.jsonl")
 
     ax_stats = [extract_alphaxiv_stats(p) for p in ax_papers]
     hf_stats = [extract_huggingface_stats(p) for p in hf_papers]

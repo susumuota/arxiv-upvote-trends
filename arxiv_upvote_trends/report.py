@@ -112,6 +112,53 @@ def render_report_html(
     return output
 
 
+def render_translation_html(
+    row: ReportRow,
+    translated_abstract: str,
+    output_path: str | Path,
+    generated_at: datetime | None = None,
+) -> Path:
+    """Render a Japanese abstract translation as a static HTML file."""
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    html = translation_html(row, translated_abstract, generated_at=generated_at)
+    output.write_text(html, encoding="utf-8")
+    return output
+
+
+def translation_html(row: ReportRow, translated_abstract: str, generated_at: datetime | None = None) -> str:
+    """Return a Japanese abstract translation as an HTML string."""
+    generated = generated_at or datetime.now(tz=UTC)
+    generated_text = generated.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
+    authors = f'<p class="translation-authors">{escape(row.authors)}</p>' if row.authors else ""
+    abstract_html = escape(translated_abstract).replace("\n", "<br>")
+
+    return f"""<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Japanese abstract translation for arXiv:{escape(row.arxiv_id)}</title>
+<style>
+{_TRANSLATION_CSS}
+</style>
+</head>
+<body>
+<main class="translation-page">
+  <header class="translation-header">
+    <p class="translation-kicker">arXiv abstract translation</p>
+    <h1>{escape(row.title or row.arxiv_id)}</h1>
+    {authors}
+    <p class="translation-meta">arXiv:{escape(row.arxiv_id)} · Generated {escape(generated_text)}</p>
+  </header>
+  <section class="translation-body" aria-label="Japanese abstract translation">
+    <p>{abstract_html}</p>
+  </section>
+</main>
+</body>
+</html>
+"""
+
+
 def report_html(rows: list[ReportRow], generated_at: datetime | None = None) -> str:
     """Return the top-paper report as an HTML string."""
     generated = generated_at or datetime.now(tz=UTC)
@@ -675,6 +722,82 @@ h2 {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   text-transform: uppercase;
+}
+
+"""
+
+
+_TRANSLATION_CSS = """
+@page {
+  size: 1200px 1800px;
+  margin: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f7f7f4;
+  color: #111827;
+  font-family: "VL PGothic", "VL Gothic", sans-serif;
+  line-height: 1.65;
+}
+
+.translation-page {
+  width: 1200px;
+  min-height: 1800px;
+  padding: 56px 72px;
+}
+
+.translation-header {
+  padding-bottom: 28px;
+  border-bottom: 4px solid #0f766e;
+}
+
+.translation-kicker {
+  margin: 0 0 18px;
+  color: #0f766e;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 42px;
+  line-height: 1.22;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.translation-authors {
+  margin: 18px 0 0;
+  color: #4b5563;
+  font-size: 22px;
+}
+
+.translation-meta {
+  margin: 16px 0 0;
+  color: #6b7280;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.translation-body {
+  padding-top: 36px;
+}
+
+.translation-body p {
+  margin: 0;
+  color: #111827;
+  font-size: 24px;
+  line-height: 1.85;
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
 """
