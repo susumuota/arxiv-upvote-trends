@@ -27,6 +27,7 @@ from arxiv_upvote_trends import (
     extract_alphaxiv_stats,
     extract_huggingface_stats,
     fetch_link_card,
+    format_japanese_translation_text,
     is_arxiv_id,
     load_ranking_history,
     post_to_bluesky,
@@ -87,13 +88,13 @@ def _post_translation_reply(row, paper_result, parent):
     if not row.abstract.strip():
         return parent
     try:
-        translated_abstract = translate_abstract_to_japanese(row.arxiv_id, row.abstract)
-        if not translated_abstract:
+        translation_sentences = translate_abstract_to_japanese(row.arxiv_id, row.abstract)
+        if not translation_sentences:
             return parent
         logger.info("Rendering Japanese abstract translation HTML for %s", row.arxiv_id)
         html_path = render_translation_html(
             row,
-            translated_abstract,
+            translation_sentences,
             Path(f"reports/{row.arxiv_id}-ja-abstract.html"),
         )
         logger.info("Rendering Japanese abstract translation PDF for %s", row.arxiv_id)
@@ -110,8 +111,9 @@ def _post_translation_reply(row, paper_result, parent):
         return parent
 
     reply_ref = build_reply_ref(root=paper_result, parent=parent)
-    post_text = build_bluesky_translation_post(translated_abstract)
-    image_alt = build_bluesky_translation_alt(translated_abstract)
+    translated_text = format_japanese_translation_text(translation_sentences)
+    post_text = build_bluesky_translation_post(translated_text)
+    image_alt = build_bluesky_translation_alt(translated_text)
     time.sleep(_BLUESKY_POST_WAIT)
     result = _try_post_to_bluesky(
         f"Japanese abstract reply for {row.arxiv_id}",

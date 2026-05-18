@@ -12,6 +12,8 @@ import pandas as pd
 from pdf2image import convert_from_path
 from PIL import Image
 
+from .deepl import TranslationSentence
+
 type ReportSourceKind = Literal["alphaxiv", "huggingface"]
 
 _SOURCE_CLASSES: dict[ReportSourceKind, str] = {
@@ -114,24 +116,28 @@ def render_report_html(
 
 def render_translation_html(
     row: ReportRow,
-    translated_abstract: str,
+    translation_sentences: list[TranslationSentence],
     output_path: str | Path,
     generated_at: datetime | None = None,
 ) -> Path:
     """Render a Japanese abstract translation as a static HTML file."""
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
-    html = translation_html(row, translated_abstract, generated_at=generated_at)
+    html = translation_html(row, translation_sentences, generated_at=generated_at)
     output.write_text(html, encoding="utf-8")
     return output
 
 
-def translation_html(row: ReportRow, translated_abstract: str, generated_at: datetime | None = None) -> str:
+def translation_html(
+    row: ReportRow,
+    translation_sentences: list[TranslationSentence],
+    generated_at: datetime | None = None,
+) -> str:
     """Return a Japanese abstract translation as an HTML string."""
     generated = generated_at or datetime.now(tz=UTC)
     generated_text = generated.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
     authors = f'<p class="translation-authors">{escape(row.authors)}</p>' if row.authors else ""
-    abstract_html = escape(translated_abstract).replace("\n", "<br>")
+    abstract_html = _translation_sentences_html(translation_sentences)
 
     return f"""<!doctype html>
 <html lang="ja">
@@ -151,12 +157,24 @@ def translation_html(row: ReportRow, translated_abstract: str, generated_at: dat
     <p class="translation-meta">arXiv:{escape(row.arxiv_id)} · Generated {escape(generated_text)}</p>
   </header>
   <section class="translation-body" aria-label="Japanese abstract translation">
-    <p>{abstract_html}</p>
+{abstract_html}
   </section>
 </main>
 </body>
 </html>
 """
+
+
+def _translation_sentences_html(translation_sentences: list[TranslationSentence]) -> str:
+    return "\n".join(
+        "    "
+        f'<p class="translation-sentence">'
+        f'<span class="translation-source">{escape(sentence.source_text)}</span>'
+        "<br>"
+        f'<span class="translation-target">{escape(sentence.translated_text)}</span>'
+        "</p>"
+        for sentence in translation_sentences
+    )
 
 
 def report_html(rows: list[ReportRow], generated_at: datetime | None = None) -> str:
@@ -791,13 +809,21 @@ h1 {
   padding-top: 36px;
 }
 
-.translation-body p {
-  margin: 0;
+.translation-sentence {
+  margin: 0 0 28px;
   color: #111827;
   font-size: 24px;
   line-height: 1.85;
   font-weight: 400;
   letter-spacing: 0;
+}
+
+.translation-source {
+  color: #374151;
+}
+
+.translation-target {
+  color: #111827;
 }
 
 """

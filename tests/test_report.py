@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pandas as pd
 from PIL import Image
 
+from arxiv_upvote_trends.deepl import TranslationSentence
 from arxiv_upvote_trends.report import (
     ReportRow,
     ReportSource,
@@ -339,7 +340,10 @@ def test_render_translation_html_writes_file(tmp_path):
 
     result = render_translation_html(
         row,
-        "これは日本語の要約です。",
+        [
+            TranslationSentence("This is the first sentence.", "これは最初の文です。"),
+            TranslationSentence("This is the second sentence.", "これは次の文です。"),
+        ],
         output_path,
         generated_at=datetime(2026, 4, 23, 0, 0, tzinfo=UTC),
     )
@@ -348,7 +352,12 @@ def test_render_translation_html_writes_file(tmp_path):
     assert result == output_path
     assert '<html lang="ja">' in html
     assert "Paper title" in html
-    assert "これは日本語の要約です。" in html
+    assert "This is the first sentence." in html
+    assert "これは最初の文です。" in html
+    assert "This is the second sentence." in html
+    assert "これは次の文です。" in html
+    assert html.index("This is the first sentence.") < html.index("これは最初の文です。")
+    assert html.index("これは最初の文です。") < html.index("This is the second sentence.")
 
 
 def _sources(

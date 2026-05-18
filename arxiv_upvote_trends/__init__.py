@@ -18,7 +18,12 @@ from .bluesky import (
 )
 from .cache import fallback_cache
 from .dataset import download_papers, upload_papers
-from .deepl import prune_deepl_translation_cache, translate_abstract_to_japanese
+from .deepl import (
+    TranslationSentence,
+    format_japanese_translation_text,
+    prune_deepl_translation_cache,
+    translate_abstract_to_japanese,
+)
 from .gcs import restore_dir, save_dir
 from .hf import extract_huggingface_stats, search_huggingface
 from .pdf import capture_arxiv_first_page
@@ -34,6 +39,7 @@ from .stats import aggregate_stats, is_arxiv_id
 
 __all__ = [
     "MAX_IMAGE_BYTES",
+    "TranslationSentence",
     "aggregate_stats",
     "build_bluesky_paper_alt",
     "build_bluesky_paper_post",
@@ -52,6 +58,7 @@ __all__ = [
     "extract_huggingface_stats",
     "fallback_cache",
     "fetch_link_card",
+    "format_japanese_translation_text",
     "is_arxiv_id",
     "load_ranking_history",
     "post_to_bluesky",

@@ -189,6 +189,7 @@ dependencies = [
     { name = "pdf2image" },
     { name = "python-dotenv" },
     { name = "requests" },
+    { name = "sentencex" },
     { name = "weasyprint" },
 ]
 
@@ -213,6 +214,7 @@ requires-dist = [
     { name = "pdf2image", specifier = ">=1.17.0" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "requests", specifier = ">=2.33.1" },
+    { name = "sentencex", specifier = ">=1.0.26" },
     { name = "weasyprint", specifier = ">=68.1" },
 ]
 
@@ -2228,6 +2230,26 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/c5/f0/184b4b5f8d00f2a92cf96eec8967a3d550b52cf94362dad1100df9e48d57/send2trash-2.1.0.tar.gz", hash = "sha256:1c72b39f09457db3c05ce1d19158c2cbef4c32b8bedd02c155e49282b7ea7459", size = 17255, upload-time = "2026-01-14T06:27:36.056Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1c/78/504fdd027da3b84ff1aecd9f6957e65f35134534ccc6da8628eb71e76d3f/send2trash-2.1.0-py3-none-any.whl", hash = "sha256:0da2f112e6d6bb22de6aa6daa7e144831a4febf2a87261451c4ad849fe9a873c", size = 17610, upload-time = "2026-01-14T06:27:35.218Z" },
+]
+
+[[package]]
+name = "sentencex"
+version = "1.0.26"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b1/ca/00437910efc68d46732134fd613626aba8c930c7783d305e672be7979b99/sentencex-1.0.26.tar.gz", hash = "sha256:a251839ebb0f1279d453c0d8adf4ceab70507443a18b3e444919c63967fb108c", size = 192887, upload-time = "2026-05-18T04:38:36.217Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/67/bd/9d64c570b71174e708e8177cd71ffae7eebdd1fd633ec1c4a39133828c2b/sentencex-1.0.26-cp314-cp314-android_24_arm64_v8a.whl", hash = "sha256:98878ee5ddc080f0d0d50a6a81e9b144f4cb4c958c577075260467517dbdafa1", size = 1249759, upload-time = "2026-05-18T04:38:11.17Z" },
+    { url = "https://files.pythonhosted.org/packages/10/2d/41aee1d04670bcc6f0660ab3c7e90b6776643e2174d0767e723428d58b0e/sentencex-1.0.26-cp314-cp314-android_24_x86_64.whl", hash = "sha256:b8001c411a9330e4f67db364f9dff1700c82c45234b6777c71af616e391ef684", size = 1276366, upload-time = "2026-05-18T04:38:12.926Z" },
+    { url = "https://files.pythonhosted.org/packages/9e/3f/c3105e7c581fe50518a502a016d7671caa4f216dbf4a49f3388e67fc9806/sentencex-1.0.26-cp314-cp314-macosx_10_12_x86_64.whl", hash = "sha256:ad961265f36e45d7b2c3e8f441c4785fd887c0e89e42486e6ee09826ea08ed67", size = 1144371, upload-time = "2026-05-18T04:38:14.621Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/75/3d29e5560a830360c384a0b3d450bc1d7f57d2f8f35e9627343c9956d82c/sentencex-1.0.26-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:58dcd75038f8b5238d7f92ed0cbe61f32a190b35ab7da177f97626794e63ec8f", size = 1094236, upload-time = "2026-05-18T04:38:16.155Z" },
+    { url = "https://files.pythonhosted.org/packages/72/b7/ca197903fad56a03321a66db5e6cbdfe554ad6e1fa6bc95d99efddfff12e/sentencex-1.0.26-cp314-cp314-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:576f9e0e36717703393c441861c6e409a4bba552b3f20ac16ed6036e242e26dd", size = 1248778, upload-time = "2026-05-18T04:38:17.938Z" },
+    { url = "https://files.pythonhosted.org/packages/c6/d0/717328aa6094323bcd43643d6863d2dcf19f15d4507bd7fe2a9b2ae2ec92/sentencex-1.0.26-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:12d1a7753b80310b29c16511d47bae4233fd0fd7fa0d77903cc05d627268a298", size = 1262448, upload-time = "2026-05-18T04:38:19.448Z" },
+    { url = "https://files.pythonhosted.org/packages/c6/af/8c4a471b6bf3e7f53d266033bbc10785515fb3d496410f217a46ded22883/sentencex-1.0.26-cp314-cp314-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:7d0dfb7d8de2be7d2c47fda4b88e7786dd031db6ceef4acebcc9be0c4573219f", size = 1269292, upload-time = "2026-05-18T04:38:21.094Z" },
+    { url = "https://files.pythonhosted.org/packages/49/da/333ad303fca2b9cde8e0b05b5af6ee29eefbdd12123b1df7081fb5ef4df2/sentencex-1.0.26-cp314-cp314-win32.whl", hash = "sha256:6f2eb7bcc12ba8e2d7143ef08cfc42803523d2f6f8cf2e2255bc06dc24b9fe45", size = 859149, upload-time = "2026-05-18T04:38:22.77Z" },
+    { url = "https://files.pythonhosted.org/packages/78/a9/92a1d4ac90f3dc23583b1111d8f7f8c3e8a0e9145d67beef4343e0486cc0/sentencex-1.0.26-cp314-cp314-win_amd64.whl", hash = "sha256:fee56ce814d25b696076f070d716bb130947bd727fd849583e104b55a16930b3", size = 982276, upload-time = "2026-05-18T04:38:24.254Z" },
+    { url = "https://files.pythonhosted.org/packages/0b/f4/3594999fe2c8777f4782d00da4518e342e1ec3bef8bf55b6d6b24c0897ab/sentencex-1.0.26-cp315-cp315-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:20a8952072e6f51240a33a6f2e199f4968644feeca7e1640984936b2454742be", size = 1249002, upload-time = "2026-05-18T04:38:25.977Z" },
+    { url = "https://files.pythonhosted.org/packages/70/c4/5645f724ddd64d88102e3af6662c92ba91b26ea2fd3a4e511f29295a4dce/sentencex-1.0.26-cp315-cp315-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:559c96c1ec6c81e908e382b9e82295db23edf1404296930887c1fa02268fb617", size = 1262481, upload-time = "2026-05-18T04:38:28.264Z" },
+    { url = "https://files.pythonhosted.org/packages/6d/2d/a9bcd2c71e17e013708a503bca7b957661fd698f33906ce3d47d7d3a303f/sentencex-1.0.26-cp315-cp315-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:448ef2b2c8173b29ea527f6b363525050fbe51d41f4f1502f4b0676c6c2bd95e", size = 1268948, upload-time = "2026-05-18T04:38:29.855Z" },
 ]
 
 [[package]]

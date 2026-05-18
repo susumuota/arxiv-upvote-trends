@@ -13,6 +13,7 @@ from atproto_client.utils.text_builder import TextBuilder
 
 import main as main_module
 from arxiv_upvote_trends.bluesky import LinkCard
+from arxiv_upvote_trends.deepl import TranslationSentence
 from arxiv_upvote_trends.report import ReportSource
 
 _STUB_LINK_CARD = LinkCard(title="Page Title", description="Page description", thumb=b"fake-image")
@@ -269,7 +270,11 @@ def test_main_posts_japanese_translation_after_source_replies(monkeypatch):
     mocks = _stub_pipeline(monkeypatch)
     mocks["build_report_rows"].return_value = [row]
     mocks["capture_arxiv_first_page"].return_value = Path("reports/2604.00001.png")
-    mocks["translate_abstract_to_japanese"].return_value = "日本語の要約"
+    translation_sentences = [
+        TranslationSentence("First sentence.", "最初の文。"),
+        TranslationSentence("Next sentence.", "次の文。"),
+    ]
+    mocks["translate_abstract_to_japanese"].return_value = translation_sentences
     mocks["render_translation_html"].return_value = Path("reports/2604.00001-ja-abstract.html")
     mocks["render_report_pdf"].side_effect = [
         Path("reports/2604.00001-ja-abstract.pdf"),
@@ -284,10 +289,15 @@ def test_main_posts_japanese_translation_after_source_replies(monkeypatch):
 
     assert post_to_bluesky.call_count == 5
     mocks["translate_abstract_to_japanese"].assert_called_once_with("2604.00001", "English abstract")
+    mocks["render_translation_html"].assert_called_once_with(
+        row,
+        translation_sentences,
+        Path("reports/2604.00001-ja-abstract.html"),
+    )
     translation_call = post_to_bluesky.call_args_list[3]
-    assert translation_call.args[0].build_text() == "日本語の要約"
+    assert translation_call.args[0].build_text() == "最初の文。\n\n次の文。"
     assert translation_call.kwargs["image_path"] == Path("reports/2604.00001-ja-abstract.png")
-    assert translation_call.kwargs["image_alt"] == "日本語の要約"
+    assert translation_call.kwargs["image_alt"] == "最初の文。\n\n次の文。"
     translation_ref = translation_call.kwargs["reply_to"]
     assert translation_ref.root.uri == "at://did/paper"
     assert translation_ref.parent.uri == "at://did/ax"
