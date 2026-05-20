@@ -31,7 +31,7 @@ def test_main_skips_bluesky_when_handle_is_empty(monkeypatch):
     post_to_bluesky.assert_not_called()
 
 
-def test_main_posts_top30_report_to_bluesky_without_new_rows(monkeypatch):
+def test_main_posts_top_n_report_to_bluesky_without_new_rows(monkeypatch):
     _set_base_config(monkeypatch)
     monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
     post_to_bluesky = Mock(return_value=Mock(uri="at://did/example", cid="cid-value"))
@@ -43,9 +43,9 @@ def test_main_posts_top30_report_to_bluesky_without_new_rows(monkeypatch):
     post_to_bluesky.assert_called_once()
     report_arg = post_to_bluesky.call_args.args[0]
     assert isinstance(report_arg, TextBuilder)
-    assert report_arg.build_text() == "arXiv Upvote Trends Top 30\nNo papers found."
+    assert report_arg.build_text() == f"arXiv Upvote Trends Top {main_module._REPORT_LIMIT}\nNo papers found."
     assert post_to_bluesky.call_args.kwargs == {
-        "image_path": Path("reports/top30.png"),
+        "image_path": Path("reports/top_n.png"),
         "image_alt": "",
         "timeout": 60,
     }
@@ -58,8 +58,8 @@ def test_main_converts_pdf_to_png(monkeypatch):
     main_module.main()
 
     mocks["convert_pdf_to_png"].assert_called_once_with(
-        Path("reports/top30.pdf"),
-        "reports/top30.png",
+        Path("reports/top_n.pdf"),
+        "reports/top_n.png",
         100,
         main_module.MAX_IMAGE_BYTES,
     )
@@ -86,7 +86,7 @@ def test_main_continues_when_bluesky_post_fails(monkeypatch, caplog):
     restore_dir.assert_called_once_with("cache-bucket", "persistent_data.tar.gz", "./persistent_data")
     save_dir.assert_called_once_with("cache-bucket", "persistent_data.tar.gz", "./persistent_data")
     assert "Skipping Bluesky post for 2604.00001 after RuntimeError." in caplog.text
-    assert "Skipping Bluesky top 30 report after RuntimeError." in caplog.text
+    assert "Skipping Bluesky Top N report after RuntimeError." in caplog.text
 
 
 def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
@@ -129,7 +129,7 @@ def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
     }
     report_arg = post_to_bluesky.call_args_list[6].args[0]
     assert isinstance(report_arg, TextBuilder)
-    assert report_arg.build_text() == "arXiv Upvote Trends Top 30\n[1/3] [2/3] [3/3]"
+    assert report_arg.build_text() == f"arXiv Upvote Trends Top {main_module._REPORT_LIMIT}\n[1/3] [2/3] [3/3]"
     facets = report_arg.build_facets()
     assert len(facets) == 3
     links = [f.features[0] for f in facets]
@@ -138,7 +138,7 @@ def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
     assert links[1].uri == "https://arxiv.org/abs/2604.00002"
     assert links[2].uri == "https://arxiv.org/abs/2604.00003"
     assert post_to_bluesky.call_args_list[6].kwargs == {
-        "image_path": Path("reports/top30.png"),
+        "image_path": Path("reports/top_n.png"),
         "image_alt": (
             "1/3 https://arxiv.org/abs/2604.00001\n"
             "2/3 https://arxiv.org/abs/2604.00002\n"
@@ -278,11 +278,11 @@ def test_main_posts_japanese_translation_after_source_replies(monkeypatch):
     mocks["render_translation_html"].return_value = Path("reports/2604.00001-ja-abstract.html")
     mocks["render_report_pdf"].side_effect = [
         Path("reports/2604.00001-ja-abstract.pdf"),
-        Path("reports/top30.pdf"),
+        Path("reports/top_n.pdf"),
     ]
     mocks["convert_pdf_to_png"].side_effect = [
         Path("reports/2604.00001-ja-abstract.png"),
-        Path("reports/top30.png"),
+        Path("reports/top_n.png"),
     ]
 
     main_module.main()
@@ -334,7 +334,7 @@ def test_main_continues_when_japanese_translation_fails(monkeypatch, caplog):
 
     assert "Skipping Japanese abstract reply for 2604.00001 after RuntimeError." in caplog.text
     report_arg = post_to_bluesky.call_args_list[-1].args[0]
-    assert report_arg.build_text() == "arXiv Upvote Trends Top 30\n[1/1]"
+    assert report_arg.build_text() == f"arXiv Upvote Trends Top {main_module._REPORT_LIMIT}\n[1/1]"
 
 
 def _set_base_config(monkeypatch):
@@ -347,10 +347,10 @@ def _stub_pipeline(monkeypatch, stats: pd.DataFrame | None = None) -> dict[str, 
     mocks = {
         "build_report_rows": Mock(return_value=[]),
         "capture_arxiv_first_page": Mock(),
-        "convert_pdf_to_png": Mock(return_value=Path("reports/top30.png")),
+        "convert_pdf_to_png": Mock(return_value=Path("reports/top_n.png")),
         "prune_deepl_translation_cache": Mock(),
-        "render_report_html": Mock(return_value=Path("reports/top30.html")),
-        "render_report_pdf": Mock(return_value=Path("reports/top30.pdf")),
+        "render_report_html": Mock(return_value=Path("reports/top_n.html")),
+        "render_report_pdf": Mock(return_value=Path("reports/top_n.pdf")),
         "render_translation_html": Mock(return_value=Path("reports/2604.00001-ja-abstract.html")),
         "translate_abstract_to_japanese": Mock(return_value=None),
     }

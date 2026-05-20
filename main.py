@@ -187,23 +187,23 @@ def _post_new_papers(report_rows):
 
 def _post_report(report_rows):
     logger.info("Rendering report HTML")
-    report_html_path = render_report_html(report_rows, "reports/top30.html")
+    report_html_path = render_report_html(report_rows, "reports/top_n.html")
     logger.info("Rendering report PDF")
-    report_pdf_path = render_report_pdf(report_html_path, "reports/top30.pdf")
+    report_pdf_path = render_report_pdf(report_html_path, "reports/top_n.pdf")
     logger.info("Converting report PDF to PNG")
     report_png_path = convert_pdf_to_png(
         report_pdf_path,
-        "reports/top30.png",
+        "reports/top_n.png",
         _REPORT_DPI,
         MAX_IMAGE_BYTES,
     )
-    logger.info("Saved top 30 report to %s", report_png_path)
+    logger.info("Saved Top N report to %s", report_png_path)
     if os.environ.get("BLUESKY_HANDLE", ""):
-        report_post_text = build_bluesky_report_post(report_rows)
+        report_post_text = build_bluesky_report_post(report_rows, _REPORT_LIMIT)
         report_alt_text = build_bluesky_report_alt(report_rows)
         time.sleep(_BLUESKY_POST_WAIT)
         _try_post_to_bluesky(
-            "top 30 report",
+            "Top N report",
             report_post_text,
             image_path=report_png_path,
             image_alt=report_alt_text,

@@ -316,7 +316,7 @@ def test_report_html_places_comments_under_total_score():
 
 
 def test_render_report_html_writes_file(tmp_path):
-    output_path = tmp_path / "top30.html"
+    output_path = tmp_path / "top_n.html"
 
     result = render_report_html([], output_path, generated_at=datetime(2026, 4, 23, 0, 0, tzinfo=UTC))
 

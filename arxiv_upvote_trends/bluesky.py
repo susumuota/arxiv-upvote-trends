@@ -108,15 +108,15 @@ def build_bluesky_translation_alt(translated_abstract: str) -> str:
     return _truncate(translated_abstract, _MAX_ALT_LENGTH)
 
 
-def build_bluesky_report_post(rows: list[ReportRow]) -> TextBuilder:
+def build_bluesky_report_post(rows: list[ReportRow], limit: int) -> TextBuilder:
     """Build one Bluesky post for the top report image."""
     tb = TextBuilder()
     if not rows:
-        tb.text("arXiv Upvote Trends Top 30\nNo papers found.")
+        tb.text(f"arXiv Upvote Trends Top {limit}\nNo papers found.")
         return tb
 
     total = len(rows)
-    tb.text("arXiv Upvote Trends Top 30\n")
+    tb.text(f"arXiv Upvote Trends Top {limit}\n")
     for i, row in enumerate(rows):
         tb.text("[")
         tb.link(f"{i + 1}/{total}", row.arxiv_url)

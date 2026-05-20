@@ -89,7 +89,7 @@ def test_build_bluesky_report_post_includes_linked_indices():
         _row(rank=2, arxiv_id="2604.00002", title="Second paper", score=45),
     ]
 
-    result = build_bluesky_report_post(rows)
+    result = build_bluesky_report_post(rows, 30)
 
     assert isinstance(result, TextBuilder)
     text = result.build_text()
@@ -108,7 +108,7 @@ def test_build_bluesky_report_post_includes_linked_indices():
 
 
 def test_build_bluesky_report_post_handles_empty_rows():
-    result = build_bluesky_report_post([])
+    result = build_bluesky_report_post([], 30)
     assert isinstance(result, TextBuilder)
     assert result.build_text() == "arXiv Upvote Trends Top 30\nNo papers found."
 
