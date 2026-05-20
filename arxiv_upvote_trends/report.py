@@ -759,7 +759,7 @@ body {
   margin: 0;
   background: #f7f7f4;
   color: #111827;
-  font-family: "VL PGothic", "VL Gothic", sans-serif;
+  font-family: "Noto Sans JP", sans-serif;
   line-height: 1.65;
 }
 
@@ -819,11 +819,11 @@ h1 {
 }
 
 .translation-source {
-  color: #374151;
+  color: #64748b;
 }
 
 .translation-target {
-  color: #111827;
+  color: #0f766e;
 }
 
 """
