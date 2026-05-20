@@ -162,7 +162,7 @@ Before starting, complete the [GCS bucket (optional)](#gcs-bucket-optional) step
 
 ### Artifact Registry
 
-Create a repository. Configure a cleanup policy to keep only the latest image and stay within the free tier:
+Create a repository. Configure a cleanup policy to delete images older than 7 days while keeping the latest one:
 
 ```bash
 REPO_NAME="arxiv-upvote-trends"
@@ -178,8 +178,21 @@ gcloud artifacts repositories list \
     --location="$REGION" \
     --project="$GOOGLE_CLOUD_PROJECT"
 
+# https://docs.cloud.google.com/artifact-registry/docs/repositories/cleanup-policy
+gcloud artifacts repositories delete-cleanup-policies "$REPO_NAME" \
+    --location="$REGION" \
+    --project="$GOOGLE_CLOUD_PROJECT" \
+    --policynames=delete-old,keep-latest
+
 cat > cleanup-policy.json << 'EOF'
 [
+  {
+    "name": "delete-old",
+    "action": { "type": "Delete" },
+    "condition": {
+      "olderThan": "604800s"
+    }
+  },
   {
     "name": "keep-latest",
     "action": { "type": "Keep" },
