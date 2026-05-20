@@ -1,4 +1,4 @@
-FROM python:3.14.4-slim-trixie
+FROM python:3.14.5-slim-trixie
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-noto-cjk \
@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/astral-sh/uv:0.11.8 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.15 /uv /uvx /bin/
 
 WORKDIR /app
 
