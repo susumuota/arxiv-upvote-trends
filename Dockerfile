@@ -1,7 +1,9 @@
 FROM python:3.14.5-slim-trixie
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    fonts-gfs-baskerville \
     fonts-noto-cjk \
+    fonts-roboto \
     libharfbuzz-subset0 \
     libpango-1.0-0 \
     libpangoft2-1.0-0 \

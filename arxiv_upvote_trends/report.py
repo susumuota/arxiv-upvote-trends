@@ -764,20 +764,21 @@ body {
 }
 
 .translation-page {
-  width: 1200px;
-  min-height: 1800px;
-  padding: 56px 72px;
+  width: 50em;
+  min-height: 75em;
+  padding: 2em 2.5em;
+  font-size: 24px;
 }
 
 .translation-header {
-  padding-bottom: 28px;
-  border-bottom: 4px solid #0f766e;
+  padding-bottom: 1.17em;
+  border-bottom: 0.17em solid #0f766e;
 }
 
 .translation-kicker {
-  margin: 0 0 18px;
+  margin: 0 0 0.75em;
   color: #0f766e;
-  font-size: 20px;
+  font-size: 0.83em;
   font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -786,44 +787,48 @@ body {
 h1 {
   margin: 0;
   color: #111827;
-  font-size: 42px;
+  font-family: Roboto, "Noto Sans JP", sans-serif;
+  font-size: 1.75em;
   line-height: 1.22;
   font-weight: 800;
   letter-spacing: 0;
 }
 
 .translation-authors {
-  margin: 18px 0 0;
+  margin: 0.75em 0 0;
   color: #4b5563;
-  font-size: 22px;
+  font-size: 0.92em;
 }
 
 .translation-meta {
-  margin: 16px 0 0;
+  margin: 0.67em 0 0;
   color: #6b7280;
-  font-size: 18px;
+  font-size: 0.75em;
   font-variant-numeric: tabular-nums;
 }
 
 .translation-body {
-  padding-top: 36px;
+  padding-top: 1.5em;
 }
 
 .translation-sentence {
-  margin: 0 0 28px;
+  margin: 0 0 1em;
   color: #111827;
-  font-size: 24px;
-  line-height: 1.85;
+  font-size: 1em;
+  line-height: 1.5em;
   font-weight: 400;
   letter-spacing: 0;
 }
 
 .translation-source {
-  color: #64748b;
+  color: #115e59;
+  font-family: "GFS Baskerville", "Times New Roman", Times, serif;
+  font-size: 1em;
+  font-weight: 500;
 }
 
 .translation-target {
-  color: #0f766e;
+  color: #111827;
 }
 
 """
