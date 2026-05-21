@@ -128,6 +128,15 @@ def render_translation_html(
     return output
 
 
+_TRANSLATION_FONTS_URL = (
+    "https://fonts.googleapis.com/css2?"
+    "family=Libre+Baskerville:wght@400;700&"
+    "family=Noto+Sans+JP:wght@400;500;700;800&"
+    "family=Roboto:wght@400;700;800&"
+    "display=swap"
+)
+
+
 def translation_html(
     row: ReportRow,
     translation_sentences: list[TranslationSentence],
@@ -143,6 +152,7 @@ def translation_html(
 <html lang="ja">
 <head>
 <meta charset="utf-8">
+<link href="{_TRANSLATION_FONTS_URL}" rel="stylesheet">
 <title>Japanese abstract translation for arXiv:{escape(row.arxiv_id)}</title>
 <style>
 {_TRANSLATION_CSS}
@@ -191,6 +201,7 @@ def report_html(rows: list[ReportRow], generated_at: datetime | None = None) -> 
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <title>arXiv Upvote Trends Top {len(rows)}</title>
 <style>
 {_CSS}
@@ -822,9 +833,9 @@ h1 {
 
 .translation-source {
   color: #115e59;
-  font-family: "GFS Baskerville", "Times New Roman", Times, serif;
+  font-family: "Libre Baskerville", "Times New Roman", Times, serif;
   font-size: 1em;
-  font-weight: 500;
+  font-weight: 700;
 }
 
 .translation-target {
