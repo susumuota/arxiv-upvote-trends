@@ -134,8 +134,8 @@ uv run --frozen --no-dev python main.py  # Run on the host
 ```bash
 gcloud auth application-default login  # First time only
 
-# 1 CPU, 1GB Memory, 10GB Disk, similar to Cloud Run Jobs free tier
-# colima start -c 1 -m 1 -d 10
+# 1 CPU, 2GB Memory, 100GB Disk, similar to Cloud Run Jobs free tier
+# colima start -c 1 -m 2 -d 100 -t vz
 
 IMAGE_NAME="arxiv-upvote-trends"
 
