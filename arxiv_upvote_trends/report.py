@@ -578,8 +578,9 @@ h1 {
   min-height: 76px;
   padding: 8px 20px;
   background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-bottom-color: rgba(15, 23, 42, 0.12);
   border-radius: 14px;
-  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .rank-badge {
