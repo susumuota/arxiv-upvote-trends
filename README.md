@@ -51,9 +51,10 @@ Omit `--private` to make the repository public.
 hf repos create $HF_REPO_ID --type dataset --private
 ```
 
-### Bluesky posting (optional)
+### Bluesky posting
 
-Setup steps for posting newly ranked papers to Bluesky. Each new ranking entry is posted separately with its
+Setup steps for posting newly ranked papers to Bluesky. Bluesky posting is required for normal job execution.
+Each new ranking entry is posted separately with its
 first-page image when the arXiv PDF capture succeeds. Create an app password in Bluesky settings.
 For local runs, set the posting configuration in `.env`. For Cloud Run Jobs, store the app password in
 Secret Manager and inject it as `BLUESKY_APP_PASSWORD`.
@@ -65,7 +66,7 @@ BLUESKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
 BLUESKY_SERVICE_URL=https://bsky.social
 ```
 
-If `BLUESKY_HANDLE` is empty or unset, the job skips posting.
+If `BLUESKY_HANDLE` or `BLUESKY_APP_PASSWORD` is empty or unset, the job fails before fetching papers.
 
 ### DeepL abstract translations (optional)
 

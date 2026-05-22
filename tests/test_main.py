@@ -25,14 +25,26 @@ def _skip_bluesky_post_wait(monkeypatch):
     monkeypatch.setattr(main_module, "_BLUESKY_POST_WAIT", 0)
 
 
-def test_main_skips_bluesky_when_handle_is_empty(monkeypatch):
+def test_main_requires_bluesky_handle(monkeypatch):
     _set_base_config(monkeypatch)
     monkeypatch.delenv("BLUESKY_HANDLE", raising=False)
     post_to_bluesky = Mock()
     monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
-    _stub_pipeline(monkeypatch)
 
-    main_module.main()
+    with pytest.raises(ValueError, match="BLUESKY_HANDLE"):
+        main_module.main()
+
+    post_to_bluesky.assert_not_called()
+
+
+def test_main_requires_bluesky_app_password(monkeypatch):
+    _set_base_config(monkeypatch)
+    monkeypatch.delenv("BLUESKY_APP_PASSWORD", raising=False)
+    post_to_bluesky = Mock()
+    monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
+
+    with pytest.raises(ValueError, match="BLUESKY_APP_PASSWORD"):
+        main_module.main()
 
     post_to_bluesky.assert_not_called()
 
@@ -59,6 +71,7 @@ def test_main_posts_top_n_report_to_bluesky_without_new_rows(monkeypatch):
 
 def test_main_converts_pdf_to_png(monkeypatch):
     _set_base_config(monkeypatch)
+    monkeypatch.setattr(main_module, "post_to_bluesky", Mock(return_value=_post_result("report")))
     mocks = _stub_pipeline(monkeypatch)
 
     main_module.main()
@@ -89,13 +102,15 @@ def test_main_continues_when_bluesky_post_fails(monkeypatch, caplog):
         main_module.main()
 
     assert post_to_bluesky.call_count == 2
+    mocks["update_ranking_history"].assert_called_once()
+    assert mocks["update_ranking_history"].call_args.args[1] == []
     restore_dir.assert_called_once_with("cache-bucket", "persistent_data.tar.gz", "./persistent_data")
     save_dir.assert_called_once_with("cache-bucket", "persistent_data.tar.gz", "./persistent_data")
     assert "Skipping Bluesky post for 2604.00001 after RuntimeError." in caplog.text
     assert "Skipping Bluesky Top N report after RuntimeError." in caplog.text
 
 
-def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
+def test_main_posts_each_new_first_page_to_bluesky(monkeypatch, caplog):
     _set_base_config(monkeypatch)
     _set_bluesky_credentials(monkeypatch)
     post_to_bluesky = Mock(return_value=_post_result("example"))
@@ -112,7 +127,8 @@ def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
         Path("reports/2604.00002.png"),
     ]
 
-    main_module.main()
+    with caplog.at_level(logging.INFO):
+        main_module.main()
 
     assert mocks["capture_arxiv_first_page"].call_args_list == [
         call("2604.00003", Path("reports/2604.00003.png"), max_output_bytes=main_module.MAX_IMAGE_BYTES),
@@ -152,11 +168,14 @@ def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
         ),
         "timeout": 60,
     }
+    mocks["update_ranking_history"].assert_called_once()
+    assert mocks["update_ranking_history"].call_args.args[1] == ["2604.00003", "2604.00002"]
+    assert "Updating ranking history for 2 posted papers: ['2604.00003', '2604.00002']" in caplog.text
 
 
 def test_main_filters_non_arxiv_ids_before_reporting(monkeypatch):
     _set_base_config(monkeypatch)
-    monkeypatch.delenv("BLUESKY_HANDLE", raising=False)
+    monkeypatch.setattr(main_module, "post_to_bluesky", Mock(return_value=_post_result("example")))
     stats = pd.DataFrame(
         [
             {"arxiv_id": "2604.00001", "score": 10, "num_comments": 1, "count": 1, "url": ["valid"]},
@@ -179,7 +198,7 @@ def test_main_filters_non_arxiv_ids_before_reporting(monkeypatch):
 
 def test_main_captures_first_pages_only_for_new_report_rows(monkeypatch):
     _set_base_config(monkeypatch)
-    monkeypatch.delenv("BLUESKY_HANDLE", raising=False)
+    monkeypatch.setattr(main_module, "post_to_bluesky", Mock(return_value=_post_result("example")))
     stats = pd.DataFrame(
         [
             {"arxiv_id": "2604.00001", "score": 10, "num_comments": 1, "count": 1, "url": []},
@@ -201,6 +220,22 @@ def test_main_captures_first_pages_only_for_new_report_rows(monkeypatch):
         call("2604.00003", Path("reports/2604.00003.png"), max_output_bytes=main_module.MAX_IMAGE_BYTES),
         call("2604.00002", Path("reports/2604.00002.png"), max_output_bytes=main_module.MAX_IMAGE_BYTES),
     ]
+
+
+def test_main_does_not_update_history_when_first_page_capture_fails(monkeypatch):
+    _set_base_config(monkeypatch)
+    post_to_bluesky = Mock(return_value=_post_result("report"))
+    monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
+    row = _report_row("2604.00001", is_new=True)
+    mocks = _stub_pipeline(monkeypatch)
+    mocks["build_report_rows"].return_value = [row]
+    mocks["capture_arxiv_first_page"].side_effect = RuntimeError("pdf failed")
+
+    main_module.main()
+
+    assert post_to_bluesky.call_count == 1
+    mocks["update_ranking_history"].assert_called_once()
+    assert mocks["update_ranking_history"].call_args.args[1] == []
 
 
 def test_main_posts_reply_thread_ordered_by_score(monkeypatch):
@@ -233,6 +268,8 @@ def test_main_posts_reply_thread_ordered_by_score(monkeypatch):
     assert "(2/2)" in ax_call.args[0].build_text()
     assert "8 Upvotes" in ax_call.args[0].build_text()
     _assert_reply_ref(ax_call, root_uri="at://did/paper", parent_uri="at://did/hf")
+    mocks["update_ranking_history"].assert_called_once()
+    assert mocks["update_ranking_history"].call_args.args[1] == ["2604.00001"]
 
 
 def test_main_posts_alphaxiv_reply_under_paper_when_hf_reply_fails(monkeypatch):
@@ -257,6 +294,8 @@ def test_main_posts_alphaxiv_reply_under_paper_when_hf_reply_fails(monkeypatch):
     assert post_to_bluesky.call_count == 5
     ax_call = post_to_bluesky.call_args_list[2]
     _assert_reply_ref(ax_call, root_uri="at://did/paper", parent_uri="at://did/paper")
+    mocks["update_ranking_history"].assert_called_once()
+    assert mocks["update_ranking_history"].call_args.args[1] == ["2604.00001"]
 
 
 def test_main_posts_japanese_translation_after_source_replies(monkeypatch):
@@ -345,11 +384,12 @@ def test_main_continues_when_japanese_translation_fails(monkeypatch, caplog):
 def _set_base_config(monkeypatch):
     monkeypatch.setattr(main_module, "GCS_BUCKET", "")
     monkeypatch.setattr(main_module, "HF_REPO_ID", "")
-    monkeypatch.delenv("BLUESKY_HANDLE", raising=False)
+    _set_bluesky_credentials(monkeypatch)
 
 
 def _set_bluesky_credentials(monkeypatch):
     monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    monkeypatch.setenv("BLUESKY_APP_PASSWORD", "app-password")
 
 
 def _post_result(label: str) -> Mock:
@@ -372,11 +412,12 @@ def _stub_pipeline(monkeypatch, stats: pd.DataFrame | None = None) -> dict[str, 
         "render_report_pdf": Mock(return_value=Path("reports/top_n.pdf")),
         "render_translation_html": Mock(return_value=Path("reports/2604.00001-ja-abstract.html")),
         "translate_abstract_to_japanese": Mock(return_value=None),
+        "update_ranking_history": Mock(),
     }
     monkeypatch.setattr(main_module, "search_alphaxiv", Mock(return_value=[]))
     monkeypatch.setattr(main_module, "search_huggingface", Mock(return_value=[]))
     monkeypatch.setattr(main_module, "load_ranking_history", Mock(return_value={}))
-    monkeypatch.setattr(main_module, "update_ranking_history", Mock())
+    monkeypatch.setattr(main_module, "update_ranking_history", mocks["update_ranking_history"])
     monkeypatch.setattr(
         main_module,
         "aggregate_stats",

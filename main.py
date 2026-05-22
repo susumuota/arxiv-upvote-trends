@@ -85,6 +85,13 @@ def _try_post_to_bluesky(label, text, **kwargs):
         return post_result
 
 
+def _require_bluesky_config() -> None:
+    if not os.environ.get("BLUESKY_HANDLE", "").strip():
+        raise ValueError("BLUESKY_HANDLE is required")
+    if not os.environ.get("BLUESKY_APP_PASSWORD", "").strip():
+        raise ValueError("BLUESKY_APP_PASSWORD is required")
+
+
 def _post_links_reply(row, paper_result, parent):
     reply_ref = build_reply_ref(root=paper_result, parent=parent)
     post_text = build_bluesky_links_reply(row.arxiv_id)
@@ -149,8 +156,8 @@ def _post_translation_reply(row, paper_result, parent):
 
 
 def _post_new_papers(report_rows):
-    bluesky_handle = os.environ.get("BLUESKY_HANDLE", "")
     total = len(report_rows)
+    posted_arxiv_ids = []
     for row in reversed(report_rows):
         if not row.is_new:
             continue
@@ -165,48 +172,49 @@ def _post_new_papers(report_rows):
             logger.exception("Failed to capture first page for %s", row.arxiv_id)
             continue
         logger.info("Captured arXiv first page for %s", row.arxiv_id)
-        if bluesky_handle:
-            image_alt = build_bluesky_paper_alt(row)
-            post_text = build_bluesky_paper_post(row, total=total)
-            time.sleep(_BLUESKY_POST_WAIT)
-            paper_result = _try_post_to_bluesky(
-                f"post for {row.arxiv_id}", post_text, image_path=image_path, image_alt=image_alt
+        image_alt = build_bluesky_paper_alt(row)
+        post_text = build_bluesky_paper_post(row, total=total)
+        time.sleep(_BLUESKY_POST_WAIT)
+        paper_result = _try_post_to_bluesky(
+            f"post for {row.arxiv_id}", post_text, image_path=image_path, image_alt=image_alt
+        )
+        if paper_result is None:
+            continue
+        posted_arxiv_ids.append(row.arxiv_id)
+        sources = sorted(row.sources, key=lambda source: -source.score)
+        parent = paper_result
+        for i, source in enumerate(sources):
+            try:
+                card = fetch_link_card(source.url)
+            except Exception:
+                logger.warning("Failed to fetch link card for %s", source.url)
+                card = None
+            reply_text = build_bluesky_source_reply(
+                source.label,
+                source.url,
+                source.score,
+                source.num_comments,
+                i + 1,
+                len(sources),
+                published_at=source.published_at,
             )
-            if paper_result is None:
-                continue
-            sources = sorted(row.sources, key=lambda source: -source.score)
-            parent = paper_result
-            for i, source in enumerate(sources):
-                try:
-                    card = fetch_link_card(source.url)
-                except Exception:
-                    logger.warning("Failed to fetch link card for %s", source.url)
-                    card = None
-                reply_text = build_bluesky_source_reply(
-                    source.label,
-                    source.url,
-                    source.score,
-                    source.num_comments,
-                    i + 1,
-                    len(sources),
-                    published_at=source.published_at,
-                )
-                reply_embed = build_external_embed(
-                    source.url, card.title if card else source.label, card.description if card else row.title
-                )
-                reply_ref = build_reply_ref(root=paper_result, parent=parent)
-                time.sleep(_BLUESKY_POST_WAIT)
-                result = _try_post_to_bluesky(
-                    f"{source.label} reply for {row.arxiv_id}",
-                    reply_text,
-                    reply_to=reply_ref,
-                    embed=reply_embed,
-                    thumb=card.thumb if card else None,
-                )
-                if result is not None:
-                    parent = result
-            parent = _post_links_reply(row, paper_result, parent)
-            _post_translation_reply(row, paper_result, parent)
+            reply_embed = build_external_embed(
+                source.url, card.title if card else source.label, card.description if card else row.title
+            )
+            reply_ref = build_reply_ref(root=paper_result, parent=parent)
+            time.sleep(_BLUESKY_POST_WAIT)
+            result = _try_post_to_bluesky(
+                f"{source.label} reply for {row.arxiv_id}",
+                reply_text,
+                reply_to=reply_ref,
+                embed=reply_embed,
+                thumb=card.thumb if card else None,
+            )
+            if result is not None:
+                parent = result
+        parent = _post_links_reply(row, paper_result, parent)
+        _post_translation_reply(row, paper_result, parent)
+    return posted_arxiv_ids
 
 
 def _post_report(report_rows):
@@ -222,20 +230,21 @@ def _post_report(report_rows):
         MAX_IMAGE_BYTES,
     )
     logger.info("Saved Top N report to %s", report_png_path)
-    if os.environ.get("BLUESKY_HANDLE", ""):
-        report_post_text = build_bluesky_report_post(report_rows, _REPORT_LIMIT)
-        report_alt_text = build_bluesky_report_alt(report_rows)
-        time.sleep(_BLUESKY_POST_WAIT)
-        _try_post_to_bluesky(
-            "Top N report",
-            report_post_text,
-            image_path=report_png_path,
-            image_alt=report_alt_text,
-            timeout=60,
-        )
+    report_post_text = build_bluesky_report_post(report_rows, _REPORT_LIMIT)
+    report_alt_text = build_bluesky_report_alt(report_rows)
+    time.sleep(_BLUESKY_POST_WAIT)
+    _try_post_to_bluesky(
+        "Top N report",
+        report_post_text,
+        image_path=report_png_path,
+        image_alt=report_alt_text,
+        timeout=60,
+    )
 
 
 def main():
+    _require_bluesky_config()
+
     if GCS_BUCKET:
         logger.info("Restoring persistent data from GCS")
         restore_dir(GCS_BUCKET, "persistent_data.tar.gz", "./persistent_data")
@@ -271,10 +280,10 @@ def main():
     known_ids = {aid for aid, first_seen in history.items() if now - first_seen >= timedelta(hours=_KNOWN_ID_HOURS)}
     logger.info("Building report rows")
     report_rows = build_report_rows(df_stats, ax_papers, hf_papers, limit=_REPORT_LIMIT, known_arxiv_ids=known_ids)
-    logger.info("Updating ranking history")
-    update_ranking_history(history, [row.arxiv_id for row in report_rows], now)
 
-    _post_new_papers(report_rows)
+    posted_arxiv_ids = _post_new_papers(report_rows)
+    logger.info("Updating ranking history for %s posted papers: %s", len(posted_arxiv_ids), posted_arxiv_ids)
+    update_ranking_history(history, posted_arxiv_ids, now)
     _post_report(report_rows)
 
     if GCS_BUCKET:
