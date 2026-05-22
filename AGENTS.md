@@ -12,6 +12,8 @@
 
 ## Testing
 
+- During iterative development, run only the focused tests relevant to the changed files
+- Do not manually repeat the full pytest suite when the next step is `git commit`; the pre-commit hook runs `uv run pytest` automatically
 - When testing a function decorated with `@fallback_cache()`, use `func.__wrapped__` to bypass the decorator
 
 ## Code Style
