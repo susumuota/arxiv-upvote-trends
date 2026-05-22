@@ -242,14 +242,7 @@ def _post_report(report_rows):
     )
 
 
-def main():
-    _require_bluesky_config()
-
-    if GCS_BUCKET:
-        logger.info("Restoring persistent data from GCS")
-        restore_dir(GCS_BUCKET, "persistent_data.tar.gz", "./persistent_data")
-        logger.info("Restored persistent data from GCS")
-
+def _run_pipeline():
     logger.info("Pruning DeepL translation cache")
     prune_deepl_translation_cache()
     logger.info("Pruned DeepL translation cache")
@@ -286,10 +279,33 @@ def main():
     update_ranking_history(history, posted_arxiv_ids, now)
     _post_report(report_rows)
 
+
+def _save_persistent_data():
+    logger.info("Saving persistent data to GCS")
+    save_dir(GCS_BUCKET, "persistent_data.tar.gz", "./persistent_data")
+    logger.info("Saved persistent data to GCS")
+
+
+def _restore_persistent_data():
+    logger.info("Restoring persistent data from GCS")
+    restore_dir(GCS_BUCKET, "persistent_data.tar.gz", "./persistent_data")
+    logger.info("Restored persistent data from GCS")
+
+
+def main():
+    _require_bluesky_config()
+
     if GCS_BUCKET:
-        logger.info("Saving persistent data to GCS")
-        save_dir(GCS_BUCKET, "persistent_data.tar.gz", "./persistent_data")
-        logger.info("Saved persistent data to GCS")
+        _restore_persistent_data()
+
+    try:
+        _run_pipeline()
+    except Exception:
+        logger.exception("Pipeline failed")
+        raise
+    finally:
+        if GCS_BUCKET:
+            _save_persistent_data()
 
 
 if __name__ == "__main__":

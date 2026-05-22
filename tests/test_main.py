@@ -110,6 +110,66 @@ def test_main_continues_when_bluesky_post_fails(monkeypatch, caplog):
     assert "Skipping Bluesky Top N report after RuntimeError." in caplog.text
 
 
+def test_main_saves_persistent_data_when_report_render_fails(monkeypatch):
+    _set_base_config(monkeypatch)
+    monkeypatch.setattr(main_module, "GCS_BUCKET", "cache-bucket")
+    _set_bluesky_credentials(monkeypatch)
+    restore_dir = Mock()
+    save_dir = Mock()
+    monkeypatch.setattr(main_module, "restore_dir", restore_dir)
+    monkeypatch.setattr(main_module, "save_dir", save_dir)
+    monkeypatch.setattr(main_module, "post_to_bluesky", Mock(return_value=_post_result("example")))
+    mocks = _stub_pipeline(monkeypatch)
+    mocks["build_report_rows"].return_value = [_report_row("2604.00001", is_new=True)]
+    mocks["capture_arxiv_first_page"].return_value = Path("reports/2604.00001.png")
+    mocks["render_report_html"].side_effect = RuntimeError("render failed")
+
+    with pytest.raises(RuntimeError, match="render failed"):
+        main_module.main()
+
+    restore_dir.assert_called_once_with("cache-bucket", "persistent_data.tar.gz", "./persistent_data")
+    mocks["update_ranking_history"].assert_called_once()
+    assert mocks["update_ranking_history"].call_args.args[1] == ["2604.00001"]
+    save_dir.assert_called_once_with("cache-bucket", "persistent_data.tar.gz", "./persistent_data")
+
+
+def test_main_does_not_save_when_persistent_data_restore_fails(monkeypatch):
+    _set_base_config(monkeypatch)
+    monkeypatch.setattr(main_module, "GCS_BUCKET", "cache-bucket")
+    _set_bluesky_credentials(monkeypatch)
+    restore_dir = Mock(side_effect=RuntimeError("restore failed"))
+    save_dir = Mock()
+    monkeypatch.setattr(main_module, "restore_dir", restore_dir)
+    monkeypatch.setattr(main_module, "save_dir", save_dir)
+
+    with pytest.raises(RuntimeError, match="restore failed"):
+        main_module.main()
+
+    restore_dir.assert_called_once_with("cache-bucket", "persistent_data.tar.gz", "./persistent_data")
+    save_dir.assert_not_called()
+
+
+def test_main_logs_pipeline_error_when_save_after_failure_fails(monkeypatch, caplog):
+    _set_base_config(monkeypatch)
+    monkeypatch.setattr(main_module, "GCS_BUCKET", "cache-bucket")
+    _set_bluesky_credentials(monkeypatch)
+    monkeypatch.setattr(main_module, "restore_dir", Mock())
+    save_dir = Mock(side_effect=RuntimeError("save failed"))
+    monkeypatch.setattr(main_module, "save_dir", save_dir)
+    monkeypatch.setattr(main_module, "post_to_bluesky", Mock(return_value=_post_result("example")))
+    mocks = _stub_pipeline(monkeypatch)
+    mocks["build_report_rows"].return_value = [_report_row("2604.00001", is_new=True)]
+    mocks["capture_arxiv_first_page"].return_value = Path("reports/2604.00001.png")
+    mocks["render_report_html"].side_effect = ValueError("report failed")
+
+    with caplog.at_level(logging.ERROR), pytest.raises(RuntimeError, match="save failed"):
+        main_module.main()
+
+    save_dir.assert_called_once_with("cache-bucket", "persistent_data.tar.gz", "./persistent_data")
+    assert "Pipeline failed" in caplog.text
+    assert "ValueError: report failed" in caplog.text
+
+
 def test_main_posts_each_new_first_page_to_bluesky(monkeypatch, caplog):
     _set_base_config(monkeypatch)
     _set_bluesky_credentials(monkeypatch)
