@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 _PAGE_SIZE = 20
 _SORT_BY = "Likes"
+_DEFAULT_TIMEOUT = 30
 _USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)"
     " Chrome/146.0.0.0 Safari/537.36"
@@ -25,6 +26,7 @@ def _get_alphaxiv(
     page_num: int = 0,
     interval: str = "30+Days",
     wait: float = 1.0,
+    timeout: float = _DEFAULT_TIMEOUT,
 ) -> list[dict]:
     """Fetch one alphaXiv page after a throttling delay.
 
@@ -33,7 +35,7 @@ def _get_alphaxiv(
     url = f"https://api.alphaxiv.org/papers/v3/feed?pageNum={page_num}&sort={_SORT_BY}&pageSize={_PAGE_SIZE}&interval={interval}&topics=%5B%5D"
     referer = f"https://www.alphaxiv.org/?interval={interval}&sort={_SORT_BY}"
     time.sleep(wait)
-    response = requests.get(url, headers={"Referer": referer, "User-Agent": _USER_AGENT})
+    response = requests.get(url, headers={"Referer": referer, "User-Agent": _USER_AGENT}, timeout=timeout)
     logger.info("Fetched page %s with status code %s", page_num, response.status_code)
     if response.status_code != 200:
         raise Exception(f"Failed to fetch data: {response.status_code}")
@@ -50,6 +52,7 @@ def search_alphaxiv(
     max_papers: int = 300,
     interval: str = "30+Days",
     wait: float = 1.0,
+    timeout: float = _DEFAULT_TIMEOUT,
 ) -> list[dict]:
     """Fetch trending papers from alphaXiv with pagination.
 
@@ -57,7 +60,10 @@ def search_alphaxiv(
     Falls back to the cached result via fallback_cache when the API is unavailable.
     """
     total_pages = math.ceil(max_papers / _PAGE_SIZE)
-    pages = [_get_alphaxiv(page_num=page_num, interval=interval, wait=wait) for page_num in range(total_pages)]
+    pages = [
+        _get_alphaxiv(page_num=page_num, interval=interval, wait=wait, timeout=timeout)
+        for page_num in range(total_pages)
+    ]
     return deduplicate(chain.from_iterable(pages), key=_paper_id)[:max_papers]
 
 

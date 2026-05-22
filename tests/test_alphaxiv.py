@@ -18,6 +18,20 @@ def test__get_alphaxiv_returns_papers(mock_get, mock_sleep):
     )
     result = _get_alphaxiv(page_num=0, wait=0)
     assert result == [{"id": "1"}, {"id": "2"}]
+    assert mock_get.call_args.kwargs["timeout"] == 30
+
+
+@patch("arxiv_upvote_trends.alphaxiv.time.sleep")
+@patch("arxiv_upvote_trends.alphaxiv.requests.get")
+def test__get_alphaxiv_uses_custom_timeout(mock_get, mock_sleep):
+    mock_get.return_value = MagicMock(
+        status_code=200,
+        json=lambda: {"papers": [{"id": "1"}]},
+    )
+
+    _get_alphaxiv(wait=0, timeout=12.5)
+
+    assert mock_get.call_args.kwargs["timeout"] == 12.5
 
 
 @patch("arxiv_upvote_trends.alphaxiv.time.sleep")
@@ -56,7 +70,7 @@ def test_search_alphaxiv_single_page(mock_get, tmp_path):
     mock_get.return_value = [{"universal_paper_id": "2604.00001"}, {"universal_paper_id": "2604.00002"}]
     result = search_alphaxiv.__wrapped__(max_papers=5, wait=0)
     assert result == [{"universal_paper_id": "2604.00001"}, {"universal_paper_id": "2604.00002"}]
-    mock_get.assert_called_once_with(page_num=0, interval="30+Days", wait=0)
+    mock_get.assert_called_once_with(page_num=0, interval="30+Days", wait=0, timeout=30)
 
 
 def test_extract_alphaxiv_stats():
