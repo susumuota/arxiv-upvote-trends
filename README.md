@@ -396,11 +396,11 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 ```bash
 # Test
-pytest
+uv run pytest
 
 # Lint & Format
-ruff check .
-ruff format .
+uv run ruff check .
+uv run ruff format .
 ```
 
 ### pre-commit
