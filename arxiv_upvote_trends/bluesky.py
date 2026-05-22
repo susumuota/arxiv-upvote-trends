@@ -141,6 +141,28 @@ def build_bluesky_source_reply(
     return tb
 
 
+def build_bluesky_links_reply(arxiv_id: str) -> TextBuilder:
+    """Build a Bluesky reply post with paper links and platform search links."""
+    tb = TextBuilder()
+    tb.text("Links: ")
+    tb.link("abs", f"https://arxiv.org/abs/{arxiv_id}")
+    tb.text(", ")
+    tb.link("pdf", f"https://arxiv.org/pdf/{arxiv_id}.pdf")
+    tb.text("\nSearch: ")
+    tb.link("Bluesky", f"https://bsky.app/search?q=%22{arxiv_id}%22")
+    tb.text(", ")
+    tb.link("Twitter", f"https://x.com/search?q=%22{arxiv_id}%22")
+    tb.text(", ")
+    tb.link("Reddit", f"https://www.reddit.com/search/?q=%22{arxiv_id}%22")
+    tb.text(", ")
+    tb.link("Hacker News", f"https://hn.algolia.com/?query=%22{arxiv_id}%22")
+    tb.text(", ")
+    tb.link("Hugging Face", f"https://huggingface.co/papers/{arxiv_id}")
+    tb.text(", ")
+    tb.link("alphaXiv", f"https://www.alphaxiv.org/abs/{arxiv_id}")
+    return tb
+
+
 def build_external_embed(uri: str, title: str, description: str) -> models.AppBskyEmbedExternal.Main:
     """Build an external link card embed."""
     return models.AppBskyEmbedExternal.Main(

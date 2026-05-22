@@ -4,6 +4,7 @@
 from .alphaxiv import extract_alphaxiv_stats, search_alphaxiv
 from .bluesky import (
     MAX_IMAGE_BYTES,
+    build_bluesky_links_reply,
     build_bluesky_paper_alt,
     build_bluesky_paper_post,
     build_bluesky_report_alt,
@@ -41,6 +42,7 @@ __all__ = [
     "MAX_IMAGE_BYTES",
     "TranslationSentence",
     "aggregate_stats",
+    "build_bluesky_links_reply",
     "build_bluesky_paper_alt",
     "build_bluesky_paper_post",
     "build_bluesky_report_alt",

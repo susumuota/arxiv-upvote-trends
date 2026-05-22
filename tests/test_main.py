@@ -118,7 +118,7 @@ def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
         call("2604.00003", Path("reports/2604.00003.png"), max_output_bytes=main_module.MAX_IMAGE_BYTES),
         call("2604.00002", Path("reports/2604.00002.png"), max_output_bytes=main_module.MAX_IMAGE_BYTES),
     ]
-    assert post_to_bluesky.call_count == 7
+    assert post_to_bluesky.call_count == 9
     assert post_to_bluesky.call_args_list[0].args[0].build_text() == (
         "[3/3] 10 Upvotes, 0 Comments, 1 Posts, arXiv:2604.00003\n\n🆕Paper 3"
     )
@@ -126,14 +126,14 @@ def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
         "image_path": Path("reports/2604.00003.png"),
         "image_alt": "First page of arXiv:2604.00003: Paper 3",
     }
-    assert post_to_bluesky.call_args_list[3].args[0].build_text() == (
+    assert post_to_bluesky.call_args_list[4].args[0].build_text() == (
         "[2/3] 10 Upvotes, 0 Comments, 1 Posts, arXiv:2604.00002\n\n🆕Paper 2"
     )
-    assert post_to_bluesky.call_args_list[3].kwargs == {
+    assert post_to_bluesky.call_args_list[4].kwargs == {
         "image_path": Path("reports/2604.00002.png"),
         "image_alt": "First page of arXiv:2604.00002: Paper 2",
     }
-    report_arg = post_to_bluesky.call_args_list[6].args[0]
+    report_arg = post_to_bluesky.call_args_list[8].args[0]
     assert isinstance(report_arg, TextBuilder)
     assert report_arg.build_text() == f"arXiv Upvote Trends Top {main_module._REPORT_LIMIT}\n[1/3] [2/3] [3/3]"
     facets = report_arg.build_facets()
@@ -143,7 +143,7 @@ def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
     assert links[0].uri == "https://arxiv.org/abs/2604.00001"
     assert links[1].uri == "https://arxiv.org/abs/2604.00002"
     assert links[2].uri == "https://arxiv.org/abs/2604.00003"
-    assert post_to_bluesky.call_args_list[6].kwargs == {
+    assert post_to_bluesky.call_args_list[8].kwargs == {
         "image_path": Path("reports/top_n.png"),
         "image_alt": (
             "1/3 https://arxiv.org/abs/2604.00001\n"
@@ -209,8 +209,9 @@ def test_main_posts_reply_thread_ordered_by_score(monkeypatch):
     paper_result = _post_result("paper")
     hf_result = _post_result("hf")
     ax_result = _post_result("ax")
+    links_result = _post_result("links")
     report_result = _post_result("report")
-    post_to_bluesky = Mock(side_effect=[paper_result, hf_result, ax_result, report_result])
+    post_to_bluesky = Mock(side_effect=[paper_result, hf_result, ax_result, links_result, report_result])
     monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
     row = _report_row("2604.00001", is_new=True)
     row.sources = _sources("2604.00001", ax_score=8, hf_score=20, hf_comments=3)
@@ -220,7 +221,7 @@ def test_main_posts_reply_thread_ordered_by_score(monkeypatch):
 
     main_module.main()
 
-    assert post_to_bluesky.call_count == 4
+    assert post_to_bluesky.call_count == 5
     hf_call = post_to_bluesky.call_args_list[1]
     assert "Hugging Face" in hf_call.args[0].build_text()
     assert "(1/2)" in hf_call.args[0].build_text()
@@ -239,8 +240,11 @@ def test_main_posts_alphaxiv_reply_under_paper_when_hf_reply_fails(monkeypatch):
     _set_bluesky_credentials(monkeypatch)
     paper_result = _post_result("paper")
     ax_result = _post_result("ax")
+    links_result = _post_result("links")
     report_result = _post_result("report")
-    post_to_bluesky = Mock(side_effect=[paper_result, RuntimeError("hf failed"), ax_result, report_result])
+    post_to_bluesky = Mock(
+        side_effect=[paper_result, RuntimeError("hf failed"), ax_result, links_result, report_result]
+    )
     monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
     row = _report_row("2604.00001", is_new=True)
     row.sources = _sources("2604.00001", ax_score=8, hf_score=20)
@@ -250,7 +254,7 @@ def test_main_posts_alphaxiv_reply_under_paper_when_hf_reply_fails(monkeypatch):
 
     main_module.main()
 
-    assert post_to_bluesky.call_count == 4
+    assert post_to_bluesky.call_count == 5
     ax_call = post_to_bluesky.call_args_list[2]
     _assert_reply_ref(ax_call, root_uri="at://did/paper", parent_uri="at://did/paper")
 
@@ -263,7 +267,10 @@ def test_main_posts_japanese_translation_after_source_replies(monkeypatch):
     ax_result = _post_result("ax")
     translation_result = _post_result("translation")
     report_result = _post_result("report")
-    post_to_bluesky = Mock(side_effect=[paper_result, hf_result, ax_result, translation_result, report_result])
+    links_result = _post_result("links")
+    post_to_bluesky = Mock(
+        side_effect=[paper_result, hf_result, ax_result, links_result, translation_result, report_result]
+    )
     monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
     row = _report_row("2604.00001", is_new=True, abstract="English abstract")
     row.sources = _sources("2604.00001", ax_score=8, hf_score=20, hf_comments=3)
@@ -287,18 +294,18 @@ def test_main_posts_japanese_translation_after_source_replies(monkeypatch):
 
     main_module.main()
 
-    assert post_to_bluesky.call_count == 5
+    assert post_to_bluesky.call_count == 6
     mocks["translate_abstract_to_japanese"].assert_called_once_with("2604.00001", "English abstract")
     mocks["render_translation_html"].assert_called_once_with(
         row,
         translation_sentences,
         Path("reports/2604.00001-ja-abstract.html"),
     )
-    translation_call = post_to_bluesky.call_args_list[3]
+    translation_call = post_to_bluesky.call_args_list[4]
     assert translation_call.args[0].build_text() == "最初の文。\n\n次の文。"
     assert translation_call.kwargs["image_path"] == Path("reports/2604.00001-ja-abstract.png")
     assert translation_call.kwargs["image_alt"] == "最初の文。\n\n次の文。"
-    _assert_reply_ref(translation_call, root_uri="at://did/paper", parent_uri="at://did/ax")
+    _assert_reply_ref(translation_call, root_uri="at://did/paper", parent_uri="at://did/links")
 
 
 def test_main_skips_japanese_translation_when_abstract_is_empty(monkeypatch):

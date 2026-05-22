@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from arxiv_upvote_trends import (
     MAX_IMAGE_BYTES,
     aggregate_stats,
+    build_bluesky_links_reply,
     build_bluesky_paper_alt,
     build_bluesky_paper_post,
     build_bluesky_report_alt,
@@ -82,6 +83,28 @@ def _try_post_to_bluesky(label, text, **kwargs):
     else:
         logger.info("Posted Bluesky %s: uri=%s cid=%s", label, post_result.uri, post_result.cid)
         return post_result
+
+
+def _post_links_reply(row, paper_result, parent):
+    reply_ref = build_reply_ref(root=paper_result, parent=parent)
+    post_text = build_bluesky_links_reply(row.arxiv_id)
+    try:
+        card = fetch_link_card(row.arxiv_url)
+    except Exception:
+        logger.warning("Failed to fetch link card for %s", row.arxiv_url)
+        card = None
+    reply_embed = build_external_embed(
+        row.arxiv_url, card.title if card else row.title, card.description if card else row.abstract
+    )
+    time.sleep(_BLUESKY_POST_WAIT)
+    result = _try_post_to_bluesky(
+        f"links reply for {row.arxiv_id}",
+        post_text,
+        reply_to=reply_ref,
+        embed=reply_embed,
+        thumb=card.thumb if card else None,
+    )
+    return result if result is not None else parent
 
 
 def _post_translation_reply(row, paper_result, parent):
@@ -182,6 +205,7 @@ def _post_new_papers(report_rows):
                 )
                 if result is not None:
                     parent = result
+            parent = _post_links_reply(row, paper_result, parent)
             _post_translation_reply(row, paper_result, parent)
 
 
