@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, call
 
 import pandas as pd
+import pytest
 from atproto import models
 from atproto_client.utils.text_builder import TextBuilder
 
@@ -17,6 +18,11 @@ from arxiv_upvote_trends.deepl import TranslationSentence
 from arxiv_upvote_trends.report import ReportSource
 
 _STUB_LINK_CARD = LinkCard(title="Page Title", description="Page description", thumb=b"fake-image")
+
+
+@pytest.fixture(autouse=True)
+def _skip_bluesky_post_wait(monkeypatch):
+    monkeypatch.setattr(main_module, "_BLUESKY_POST_WAIT", 0)
 
 
 def test_main_skips_bluesky_when_handle_is_empty(monkeypatch):
@@ -33,8 +39,8 @@ def test_main_skips_bluesky_when_handle_is_empty(monkeypatch):
 
 def test_main_posts_top_n_report_to_bluesky_without_new_rows(monkeypatch):
     _set_base_config(monkeypatch)
-    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
-    post_to_bluesky = Mock(return_value=Mock(uri="at://did/example", cid="cid-value"))
+    _set_bluesky_credentials(monkeypatch)
+    post_to_bluesky = Mock(return_value=_post_result("example"))
     monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
     _stub_pipeline(monkeypatch)
 
@@ -68,7 +74,7 @@ def test_main_converts_pdf_to_png(monkeypatch):
 def test_main_continues_when_bluesky_post_fails(monkeypatch, caplog):
     _set_base_config(monkeypatch)
     monkeypatch.setattr(main_module, "GCS_BUCKET", "cache-bucket")
-    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+    _set_bluesky_credentials(monkeypatch)
     post_to_bluesky = Mock(side_effect=RuntimeError("failed"))
     restore_dir = Mock()
     save_dir = Mock()
@@ -91,8 +97,8 @@ def test_main_continues_when_bluesky_post_fails(monkeypatch, caplog):
 
 def test_main_posts_each_new_first_page_to_bluesky(monkeypatch):
     _set_base_config(monkeypatch)
-    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
-    post_to_bluesky = Mock(return_value=Mock(uri="at://did/example", cid="cid-value"))
+    _set_bluesky_credentials(monkeypatch)
+    post_to_bluesky = Mock(return_value=_post_result("example"))
     monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
     report_rows = [
         _report_row("2604.00001", is_new=False, rank=1),
@@ -199,11 +205,11 @@ def test_main_captures_first_pages_only_for_new_report_rows(monkeypatch):
 
 def test_main_posts_reply_thread_ordered_by_score(monkeypatch):
     _set_base_config(monkeypatch)
-    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
-    paper_result = Mock(uri="at://did/paper", cid="cid-paper")
-    hf_result = Mock(uri="at://did/hf", cid="cid-hf")
-    ax_result = Mock(uri="at://did/ax", cid="cid-ax")
-    report_result = Mock(uri="at://did/report", cid="cid-report")
+    _set_bluesky_credentials(monkeypatch)
+    paper_result = _post_result("paper")
+    hf_result = _post_result("hf")
+    ax_result = _post_result("ax")
+    report_result = _post_result("report")
     post_to_bluesky = Mock(side_effect=[paper_result, hf_result, ax_result, report_result])
     monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
     row = _report_row("2604.00001", is_new=True)
@@ -220,24 +226,20 @@ def test_main_posts_reply_thread_ordered_by_score(monkeypatch):
     assert "(1/2)" in hf_call.args[0].build_text()
     assert "20 Upvotes" in hf_call.args[0].build_text()
     assert "3 Comments" in hf_call.args[0].build_text()
-    hf_ref = hf_call.kwargs["reply_to"]
-    assert hf_ref.root.uri == "at://did/paper"
-    assert hf_ref.parent.uri == "at://did/paper"
+    _assert_reply_ref(hf_call, root_uri="at://did/paper", parent_uri="at://did/paper")
     ax_call = post_to_bluesky.call_args_list[2]
     assert "alphaXiv" in ax_call.args[0].build_text()
     assert "(2/2)" in ax_call.args[0].build_text()
     assert "8 Upvotes" in ax_call.args[0].build_text()
-    ax_ref = ax_call.kwargs["reply_to"]
-    assert ax_ref.root.uri == "at://did/paper"
-    assert ax_ref.parent.uri == "at://did/hf"
+    _assert_reply_ref(ax_call, root_uri="at://did/paper", parent_uri="at://did/hf")
 
 
 def test_main_posts_alphaxiv_reply_under_paper_when_hf_reply_fails(monkeypatch):
     _set_base_config(monkeypatch)
-    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
-    paper_result = Mock(uri="at://did/paper", cid="cid-paper")
-    ax_result = Mock(uri="at://did/ax", cid="cid-ax")
-    report_result = Mock(uri="at://did/report", cid="cid-report")
+    _set_bluesky_credentials(monkeypatch)
+    paper_result = _post_result("paper")
+    ax_result = _post_result("ax")
+    report_result = _post_result("report")
     post_to_bluesky = Mock(side_effect=[paper_result, RuntimeError("hf failed"), ax_result, report_result])
     monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
     row = _report_row("2604.00001", is_new=True)
@@ -250,19 +252,17 @@ def test_main_posts_alphaxiv_reply_under_paper_when_hf_reply_fails(monkeypatch):
 
     assert post_to_bluesky.call_count == 4
     ax_call = post_to_bluesky.call_args_list[2]
-    ax_ref = ax_call.kwargs["reply_to"]
-    assert ax_ref.root.uri == "at://did/paper"
-    assert ax_ref.parent.uri == "at://did/paper"
+    _assert_reply_ref(ax_call, root_uri="at://did/paper", parent_uri="at://did/paper")
 
 
 def test_main_posts_japanese_translation_after_source_replies(monkeypatch):
     _set_base_config(monkeypatch)
-    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
-    paper_result = Mock(uri="at://did/paper", cid="cid-paper")
-    hf_result = Mock(uri="at://did/hf", cid="cid-hf")
-    ax_result = Mock(uri="at://did/ax", cid="cid-ax")
-    translation_result = Mock(uri="at://did/translation", cid="cid-translation")
-    report_result = Mock(uri="at://did/report", cid="cid-report")
+    _set_bluesky_credentials(monkeypatch)
+    paper_result = _post_result("paper")
+    hf_result = _post_result("hf")
+    ax_result = _post_result("ax")
+    translation_result = _post_result("translation")
+    report_result = _post_result("report")
     post_to_bluesky = Mock(side_effect=[paper_result, hf_result, ax_result, translation_result, report_result])
     monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
     row = _report_row("2604.00001", is_new=True, abstract="English abstract")
@@ -298,15 +298,13 @@ def test_main_posts_japanese_translation_after_source_replies(monkeypatch):
     assert translation_call.args[0].build_text() == "最初の文。\n\n次の文。"
     assert translation_call.kwargs["image_path"] == Path("reports/2604.00001-ja-abstract.png")
     assert translation_call.kwargs["image_alt"] == "最初の文。\n\n次の文。"
-    translation_ref = translation_call.kwargs["reply_to"]
-    assert translation_ref.root.uri == "at://did/paper"
-    assert translation_ref.parent.uri == "at://did/ax"
+    _assert_reply_ref(translation_call, root_uri="at://did/paper", parent_uri="at://did/ax")
 
 
 def test_main_skips_japanese_translation_when_abstract_is_empty(monkeypatch):
     _set_base_config(monkeypatch)
-    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
-    post_to_bluesky = Mock(return_value=Mock(uri="at://did/example", cid="cid-value"))
+    _set_bluesky_credentials(monkeypatch)
+    post_to_bluesky = Mock(return_value=_post_result("example"))
     monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
     row = _report_row("2604.00001", is_new=True, abstract="")
     mocks = _stub_pipeline(monkeypatch)
@@ -320,8 +318,8 @@ def test_main_skips_japanese_translation_when_abstract_is_empty(monkeypatch):
 
 def test_main_continues_when_japanese_translation_fails(monkeypatch, caplog):
     _set_base_config(monkeypatch)
-    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
-    post_to_bluesky = Mock(return_value=Mock(uri="at://did/example", cid="cid-value"))
+    _set_bluesky_credentials(monkeypatch)
+    post_to_bluesky = Mock(return_value=_post_result("example"))
     monkeypatch.setattr(main_module, "post_to_bluesky", post_to_bluesky)
     row = _report_row("2604.00001", is_new=True, abstract="English abstract")
     mocks = _stub_pipeline(monkeypatch)
@@ -341,6 +339,20 @@ def _set_base_config(monkeypatch):
     monkeypatch.setattr(main_module, "GCS_BUCKET", "")
     monkeypatch.setattr(main_module, "HF_REPO_ID", "")
     monkeypatch.delenv("BLUESKY_HANDLE", raising=False)
+
+
+def _set_bluesky_credentials(monkeypatch):
+    monkeypatch.setenv("BLUESKY_HANDLE", "user.bsky.social")
+
+
+def _post_result(label: str) -> Mock:
+    return Mock(uri=f"at://did/{label}", cid=f"cid-{label}")
+
+
+def _assert_reply_ref(post_call, *, root_uri: str, parent_uri: str) -> None:
+    reply_ref = post_call.kwargs["reply_to"]
+    assert reply_ref.root.uri == root_uri
+    assert reply_ref.parent.uri == parent_uri
 
 
 def _stub_pipeline(monkeypatch, stats: pd.DataFrame | None = None) -> dict[str, Mock]:
