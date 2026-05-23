@@ -26,6 +26,7 @@ from arxiv_upvote_trends import (
     capture_arxiv_first_page,
     convert_pdf_to_png,
     extract_alphaxiv_stats,
+    extract_hackernews_stats,
     extract_huggingface_stats,
     fetch_link_card,
     format_japanese_translation_text,
@@ -39,6 +40,7 @@ from arxiv_upvote_trends import (
     restore_dir,
     save_dir,
     search_alphaxiv,
+    search_hackernews,
     search_huggingface,
     translate_abstract_to_japanese,
     update_ranking_history,
@@ -257,14 +259,27 @@ def _run_pipeline():
     logger.info("Fetched %s Hugging Face papers", len(hf_papers))
     _upload_papers_if_configured("Hugging Face", hf_papers, "raw/huggingface.jsonl")
 
+    logger.info("Searching Hacker News papers")
+    hn_papers = search_hackernews(_MAX_PAPERS, days=_SEARCH_DAYS, wait=1)
+    logger.info("Fetched %s Hacker News papers", len(hn_papers))
+    _upload_papers_if_configured("Hacker News", hn_papers, "raw/hackernews.jsonl")
+
     ax_stats = [extract_alphaxiv_stats(p) for p in ax_papers]
     hf_stats = [extract_huggingface_stats(p) for p in hf_papers]
-    df_stats = aggregate_stats(ax_stats + hf_stats)
+    hn_stats = [extract_hackernews_stats(p) for p in hn_papers]
+    df_stats = aggregate_stats(ax_stats + hf_stats + hn_stats)
     valid_arxiv_id_mask = df_stats["arxiv_id"].map(is_arxiv_id)
     invalid_arxiv_ids = df_stats.loc[~valid_arxiv_id_mask, "arxiv_id"].to_list()
     if invalid_arxiv_ids:
-        logger.info("Skipping non-arXiv IDs: %s", invalid_arxiv_ids[:10])
+        logger.info("Skipping %s non-arXiv IDs (first 10): %s", len(invalid_arxiv_ids), invalid_arxiv_ids[:10])
     df_stats = df_stats.loc[valid_arxiv_id_mask].reset_index(drop=True)
+    if hn_stats:
+        ax_hf_ids = {aid for s in ax_stats + hf_stats for aid in s["arxiv_id"]}
+        hn_only_mask = ~df_stats["arxiv_id"].isin(ax_hf_ids)
+        hn_only_ids = df_stats.loc[hn_only_mask, "arxiv_id"].to_list()
+        if hn_only_ids:
+            logger.info("Skipping %s Hacker News-only papers (first 10): %s", len(hn_only_ids), hn_only_ids[:10])
+        df_stats = df_stats.loc[~hn_only_mask].reset_index(drop=True)
     logger.info("stats:\n%s", df_stats.head(50))
 
     now = datetime.now(UTC)
@@ -272,7 +287,9 @@ def _run_pipeline():
     history = load_ranking_history(now)
     known_ids = {aid for aid, first_seen in history.items() if now - first_seen >= timedelta(hours=_KNOWN_ID_HOURS)}
     logger.info("Building report rows")
-    report_rows = build_report_rows(df_stats, ax_papers, hf_papers, limit=_REPORT_LIMIT, known_arxiv_ids=known_ids)
+    report_rows = build_report_rows(
+        df_stats, ax_papers, hf_papers, hn_papers, limit=_REPORT_LIMIT, known_arxiv_ids=known_ids
+    )
 
     posted_arxiv_ids = _post_new_papers(report_rows)
     logger.info("Updating ranking history for %s posted papers: %s", len(posted_arxiv_ids), posted_arxiv_ids)

@@ -68,7 +68,7 @@ def test_build_report_rows_combines_stats_with_source_papers():
         }
     ]
 
-    rows = build_report_rows(df_stats, ax_papers, hf_papers, limit=30)
+    rows = build_report_rows(df_stats, ax_papers, hf_papers, [], limit=30)
 
     assert rows == [
         ReportRow(
@@ -133,7 +133,7 @@ def test_build_report_rows_extracts_abstract_with_hf_priority():
         {"id": "2604.00001", "title": "Paper 1", "summary": "HF summary"},
     ]
 
-    rows = build_report_rows(df_stats, ax_papers, hf_papers)
+    rows = build_report_rows(df_stats, ax_papers, hf_papers, [])
 
     assert rows[0].abstract == "HF summary"
     assert rows[1].abstract == "only alphaXiv"
@@ -148,7 +148,7 @@ def test_build_report_rows_respects_limit():
         ]
     )
 
-    rows = build_report_rows(df_stats, [], [], limit=2)
+    rows = build_report_rows(df_stats, [], [], [], limit=2)
 
     assert [row.arxiv_id for row in rows] == ["2604.00000", "2604.00001"]
 
@@ -161,7 +161,7 @@ def test_build_report_rows_marks_known_papers_as_not_new():
         ]
     )
 
-    rows = build_report_rows(df_stats, [], [], known_arxiv_ids={"2604.00001"})
+    rows = build_report_rows(df_stats, [], [], [], known_arxiv_ids={"2604.00001"})
 
     assert rows[0].is_new is False
     assert rows[1].is_new is True
@@ -170,7 +170,7 @@ def test_build_report_rows_marks_known_papers_as_not_new():
 def test_build_report_rows_defaults_all_new():
     df_stats = pd.DataFrame([{"arxiv_id": "2604.00001", "score": 10, "num_comments": 0, "count": 1, "url": []}])
 
-    rows = build_report_rows(df_stats, [], [])
+    rows = build_report_rows(df_stats, [], [], [])
 
     assert rows[0].is_new is True
 
@@ -364,16 +364,103 @@ def _sources(
     *,
     ax_score: int = 0,
     hf_score: int = 0,
+    hn_score: int = 0,
     ax_url: str = "",
     hf_url: str = "",
+    hn_url: str = "",
     hf_comments: int = 0,
+    hn_comments: int = 0,
 ) -> tuple[ReportSource, ...]:
     sources = []
     if ax_url or ax_score:
         sources.append(ReportSource("alphaxiv", ax_url, ax_score, published_at=_DT))
     if hf_url or hf_score or hf_comments:
         sources.append(ReportSource("huggingface", hf_url, hf_score, num_comments=hf_comments, published_at=_DT))
+    if hn_url or hn_score or hn_comments:
+        sources.append(ReportSource("hackernews", hn_url, hn_score, num_comments=hn_comments, published_at=_DT))
     return tuple(sources)
+
+
+def test_build_report_rows_includes_hackernews_source():
+    df_stats = pd.DataFrame(
+        [
+            {
+                "arxiv_id": "2604.00001",
+                "score": 120,
+                "num_comments": 5,
+                "count": 3,
+                "url": [
+                    "https://www.alphaxiv.org/abs/2604.00001",
+                    "https://huggingface.co/papers/2604.00001",
+                    "https://news.ycombinator.com/item?id=12345",
+                ],
+            },
+        ]
+    )
+    ax_papers = [
+        {
+            "universal_paper_id": "2604.00001",
+            "title": "alphaXiv title",
+            "metrics": {"public_total_votes": 10},
+            "publication_date": "2026-04-20T12:00:00.000Z",
+        },
+    ]
+    hf_papers = [
+        {
+            "id": "2604.00001",
+            "title": "HF title",
+            "upvotes": 7,
+            "comments": 2,
+            "published_at": "2026-04-22 00:00:00+00:00",
+        },
+    ]
+    hn_papers = [
+        {
+            "objectID": "12345",
+            "url": "https://arxiv.org/abs/2604.00001",
+            "points": 103,
+            "num_comments": 3,
+            "created_at_i": 1745280000,
+        },
+    ]
+
+    rows = build_report_rows(df_stats, ax_papers, hf_papers, hn_papers, limit=30)
+
+    assert len(rows) == 1
+    assert len(rows[0].sources) == 3
+    hn_source = rows[0].sources[2]
+    assert hn_source.kind == "hackernews"
+    assert hn_source.url == "https://news.ycombinator.com/item?id=12345"
+    assert hn_source.score == 103
+    assert hn_source.num_comments == 3
+    assert hn_source.label == "Hacker News"
+
+
+def test_report_html_includes_hackernews_bar():
+    rows = [
+        ReportRow(
+            rank=1,
+            arxiv_id="2604.00001",
+            title="Paper with HN",
+            authors="",
+            score=20,
+            num_comments=3,
+            count=2,
+            arxiv_url="https://arxiv.org/abs/2604.00001",
+            sources=_sources(
+                ax_score=8,
+                hn_score=12,
+                hn_url="https://news.ycombinator.com/item?id=99",
+            ),
+        )
+    ]
+
+    html = report_html(rows, generated_at=datetime(2026, 4, 23, 0, 0, tzinfo=UTC))
+
+    assert '<a class="tag link hn" href="https://news.ycombinator.com/item?id=99">Hacker News</a>' in html
+    assert "bar-hn" in html
+    assert "cap-hn" in html
+    assert "HN 12" in html
 
 
 def test_convert_pdf_to_png_combines_multiple_pages(tmp_path):

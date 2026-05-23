@@ -11,22 +11,27 @@ from typing import Any, Literal, cast
 import pandas as pd
 from pdf2image import convert_from_path
 from PIL import Image
+from weasyprint import HTML
 
+from .arxiv import parse_arxiv_ids
 from .deepl import TranslationSentence
 
-type ReportSourceKind = Literal["alphaxiv", "huggingface"]
+type ReportSourceKind = Literal["alphaxiv", "huggingface", "hackernews"]
 
 _SOURCE_CLASSES: dict[ReportSourceKind, str] = {
     "alphaxiv": "ax",
     "huggingface": "hf",
+    "hackernews": "hn",
 }
 _SOURCE_LABELS: dict[ReportSourceKind, str] = {
     "alphaxiv": "alphaXiv",
     "huggingface": "Hugging Face",
+    "hackernews": "Hacker News",
 }
 _SOURCE_CAPTIONS: dict[ReportSourceKind, str] = {
     "alphaxiv": "alphaXiv",
     "huggingface": "HF",
+    "hackernews": "HN",
 }
 
 
@@ -66,20 +71,23 @@ def build_report_rows(
     df_stats: pd.DataFrame,
     ax_papers: list[dict],
     hf_papers: list[dict],
+    hn_papers: list[dict],
     limit: int = 30,
     known_arxiv_ids: Set[str] = frozenset(),
 ) -> list[ReportRow]:
-    """Combine aggregated stats with raw alphaXiv and Hugging Face paper metadata."""
+    """Combine aggregated stats with raw source paper metadata."""
     ax_by_id = _index_papers(ax_papers, ("universal_paper_id", "arxiv_id", "id", "paper_id"))
     hf_by_id = _index_papers(hf_papers, ("id", "paper_id", "arxiv_id"))
+    hn_by_id = _index_hn_papers(hn_papers)
 
     rows = []
     for rank, stat in enumerate(df_stats.head(limit).to_dict("records"), start=1):
         arxiv_id = _text(stat.get("arxiv_id"))
         ax_paper = ax_by_id.get(arxiv_id, {})
         hf_paper = hf_by_id.get(arxiv_id, {})
+        hn_paper = hn_by_id.get(arxiv_id, {})
         stat_urls = tuple(_iter_urls(stat.get("url")))
-        sources = _build_sources(arxiv_id, stat_urls, ax_paper, hf_paper)
+        sources = _build_sources(arxiv_id, stat_urls, ax_paper, hf_paper, hn_paper)
 
         abstract = _first_text(hf_paper, ("summary",)) or _first_text(ax_paper, ("abstract",))
 
@@ -210,7 +218,7 @@ def report_html(rows: list[ReportRow], generated_at: datetime | None = None) -> 
 <body>
 <main class="page">
   <header class="report-header">
-    <p class="kicker">Live &middot; alphaXiv &times; Hugging Face</p>
+    <p class="kicker">Live &middot; alphaXiv &times; Hugging Face &times; Hacker News</p>
     <h1>arXiv Upvote Trends — Top {len(rows)}</h1>
     <p class="generated">Generated {escape(generated_summary)}</p>
   </header>
@@ -225,8 +233,6 @@ def report_html(rows: list[ReportRow], generated_at: datetime | None = None) -> 
 
 def render_report_pdf(html_path: str | Path, output_path: str | Path) -> Path:
     """Render a report HTML file to PDF with WeasyPrint."""
-    from weasyprint import HTML
-
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     HTML(filename=Path(html_path)).write_pdf(output)
@@ -365,6 +371,7 @@ def _build_sources(
     stat_urls: tuple[str, ...],
     ax_paper: dict,
     hf_paper: dict,
+    hn_paper: dict,
 ) -> tuple[ReportSource, ...]:
     sources: list[ReportSource] = []
 
@@ -391,7 +398,29 @@ def _build_sources(
             )
         )
 
+    hackernews_url = _source_url(stat_urls, "news.ycombinator.com")
+    if hackernews_url or hn_paper:
+        sources.append(
+            ReportSource(
+                "hackernews",
+                hackernews_url or _hackernews_url(hn_paper),
+                _int(hn_paper.get("points")),
+                num_comments=_int(hn_paper.get("num_comments")),
+                published_at=_hackernews_published_at(hn_paper),
+            )
+        )
+
     return tuple(sources)
+
+
+def _index_hn_papers(papers: list[dict]) -> dict[str, dict]:
+    indexed: dict[str, dict] = {}
+    for paper in papers:
+        url = str(paper.get("url") or "")
+        for arxiv_id in parse_arxiv_ids(url):
+            if arxiv_id not in indexed:
+                indexed[arxiv_id] = paper
+    return indexed
 
 
 def _index_papers(papers: list[dict], keys: Iterable[str]) -> dict[str, dict]:
@@ -442,6 +471,18 @@ def _alphaxiv_url(arxiv_id: str, paper: dict) -> str:
 
 def _huggingface_url(arxiv_id: str, paper: dict) -> str:
     return _first_text(paper, ("url", "html_url")) or (f"https://huggingface.co/papers/{arxiv_id}" if arxiv_id else "")
+
+
+def _hackernews_url(paper: dict) -> str:
+    object_id = _first_text(paper, ("objectID",))
+    return f"https://news.ycombinator.com/item?id={object_id}" if object_id else ""
+
+
+def _hackernews_published_at(paper: dict) -> datetime | None:
+    created_at = paper.get("created_at_i")
+    if created_at is not None:
+        return datetime.fromtimestamp(int(created_at), tz=UTC)
+    return None
 
 
 def _source_url(urls: Iterable[str], host: str) -> str:
@@ -663,6 +704,7 @@ h2 {
 .tag.link.arxiv { background: #eff6ff; color: #1d4ed8; }
 .tag.link.ax { background: #f5f3ff; color: #6d28d9; }
 .tag.link.hf { background: #fff7e6; color: #92400e; }
+.tag.link.hn { background: #fff2e8; color: #c04000; }
 .tag.new { background: #0f766e; color: #ffffff; }
 
 .score-row {
@@ -692,7 +734,8 @@ h2 {
 .bar-caption .cap-sep { color: #cbd5e1; }
 
 .bar-caption .cap-ax::before,
-.bar-caption .cap-hf::before {
+.bar-caption .cap-hf::before,
+.bar-caption .cap-hn::before {
   content: "";
   display: inline-block;
   width: 8px;
@@ -704,6 +747,7 @@ h2 {
 
 .bar-caption .cap-ax::before { background: #8b5cf6; }
 .bar-caption .cap-hf::before { background: #f59e0b; }
+.bar-caption .cap-hn::before { background: #ff6600; }
 
 .score-total {
   color: #0f172a;
@@ -741,6 +785,11 @@ h2 {
 .bar-hf {
   height: 100%;
   background: #f59e0b;
+}
+
+.bar-hn {
+  height: 100%;
+  background: #ff6600;
 }
 
 .score-comments {
