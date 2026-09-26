@@ -412,15 +412,6 @@ Git hooks are managed by [pre-commit](https://pre-commit.com/). Install the hook
 uv run pre-commit install
 ```
 
-The following hooks run automatically on `git commit`:
-
-- **trailing-whitespace** / **end-of-file-fixer** — Whitespace cleanup
-- **check-yaml** / **check-toml** — Syntax validation
-- **check-added-large-files** — Prevent accidental large file commits
-- **ruff check --fix** / **ruff format** — Lint and format
-- **gitleaks** — Secret detection (HF tokens, GCP keys, etc.)
-- **pytest** — Run tests
-
 To run all hooks manually:
 
 ```bash
