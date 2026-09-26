@@ -4,25 +4,23 @@
 import functools
 import logging
 from collections.abc import Callable
-from typing import ParamSpec, Protocol, TypeVar, cast
+from typing import Protocol, cast
 
 import joblib
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_CACHE_DIR = "./persistent_data/fallback_cache"
-P = ParamSpec("P")
-R = TypeVar("R")
 
 
-class _WrappedCallable(Protocol[P, R]):
+class _WrappedCallable[**P, R](Protocol):
     @property
     def __wrapped__(self) -> Callable[P, R]: ...
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
 
 
-def fallback_cache(cache_dir: str = _DEFAULT_CACHE_DIR) -> Callable[[Callable[P, R]], _WrappedCallable[P, R]]:
+def fallback_cache[**P, R](cache_dir: str = _DEFAULT_CACHE_DIR) -> Callable[[Callable[P, R]], _WrappedCallable[P, R]]:
     """Return a decorator that falls back to cached results after wrapped-function failures.
 
     Each call attempts to execute the function and update the cache on success.
