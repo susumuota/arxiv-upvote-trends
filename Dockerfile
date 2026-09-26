@@ -1,4 +1,4 @@
-FROM python:3.14.5-slim-trixie
+FROM python:3.14.6-slim-trixie
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libharfbuzz-subset0 \
