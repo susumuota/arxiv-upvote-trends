@@ -1,7 +1,7 @@
 [project]
 name = "arxiv-upvote-trends"
 version = "0.1.0"
-description = "Collect trending papers from Hugging Face and alphaXiv."
+description = "Collect trending papers from Hugging Face, alphaXiv, and Hacker News."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.14"

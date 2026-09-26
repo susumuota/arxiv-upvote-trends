@@ -6,9 +6,9 @@
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-Collect trending papers from [alphaXiv](https://www.alphaxiv.org/) and [Hugging Face Daily Papers](https://huggingface.co/papers).
+Collect trending papers from [Hugging Face Daily Papers](https://huggingface.co/papers), [alphaXiv](https://www.alphaxiv.org/), and [Hacker News](https://news.ycombinator.com/).
 
-Fetches upvote counts and comment stats from both sources, aggregates them by arXiv ID, and uploads the results to a Hugging Face Dataset. Runs daily on Google Cloud Run Jobs with API response caching via GCS for resilience.
+Fetches upvote counts and comment stats from all three sources, aggregates them by arXiv ID, and uploads the results to a Hugging Face Dataset. Runs daily on Google Cloud Run Jobs with API response caching via GCS for resilience.
 
 ## Requirements
 

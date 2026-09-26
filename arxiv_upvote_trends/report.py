@@ -218,7 +218,7 @@ def report_html(rows: list[ReportRow], generated_at: datetime | None = None) -> 
 <body>
 <main class="page">
   <header class="report-header">
-    <p class="kicker">Live &middot; alphaXiv &times; Hugging Face &times; Hacker News</p>
+    <p class="kicker">Live &middot; Hugging Face &times; alphaXiv &times; Hacker News</p>
     <h1>arXiv Upvote Trends — Top {len(rows)}</h1>
     <p class="generated">Generated {escape(generated_summary)}</p>
   </header>

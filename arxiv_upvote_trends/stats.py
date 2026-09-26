@@ -7,7 +7,7 @@ _AGGREGATED_COLUMNS = ["arxiv_id", "score", "num_comments", "count", "url"]
 
 
 def aggregate_stats(paper_stats: list[dict]) -> pd.DataFrame:
-    """Aggregate alphaXiv and Hugging Face scores by arXiv ID."""
+    """Aggregate Hugging Face, alphaXiv, and Hacker News scores by arXiv ID."""
     if not paper_stats:
         return pd.DataFrame(columns=_AGGREGATED_COLUMNS)
 
