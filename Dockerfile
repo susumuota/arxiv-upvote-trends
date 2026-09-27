@@ -1,3 +1,5 @@
+FROM ghcr.io/astral-sh/uv:0.11.15 AS uv
+
 FROM python:3.14.6-slim-trixie
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -7,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/astral-sh/uv:0.11.15 /uv /uvx /bin/
+COPY --from=uv /uv /uvx /bin/
 
 WORKDIR /app
 
