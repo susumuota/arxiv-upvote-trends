@@ -19,4 +19,7 @@ def test_upload_papers(mock_hf_api_cls):
     assert upload_kwargs.kwargs["path_in_repo"] == "raw/alphaxiv.jsonl"
     assert upload_kwargs.kwargs["repo_id"] == "user/test-repo"
     assert upload_kwargs.kwargs["repo_type"] == "dataset"
+    assert upload_kwargs.kwargs["path_or_fileobj"] == (
+        b'{"id": "1", "title": "Paper 1"}\n{"id": "2", "title": "Paper 2"}\n'
+    )
     assert url == "https://huggingface.co/datasets/user/test-repo"

@@ -1,7 +1,6 @@
 # Copyright (c) 2026 Susumu Ota
 # SPDX-License-Identifier: MIT
 
-import io
 import json
 import logging
 
@@ -15,16 +14,14 @@ def upload_papers(papers: list[dict], repo_id: str, filename: str) -> str:
     """Upload papers as JSONL to a Hugging Face Dataset repo."""
     api = HfApi()
 
-    with io.BytesIO() as buf:
-        for paper in papers:
-            buf.write((json.dumps(paper, ensure_ascii=False, default=str) + "\n").encode())
-        buf.seek(0)
-        api.upload_file(
-            path_or_fileobj=buf,
-            path_in_repo=filename,
-            repo_id=repo_id,
-            repo_type="dataset",
-        )
+    # Pass bytes rather than a BytesIO buffer: huggingface_hub cannot upload buffers via Xet Storage.
+    data = "".join(json.dumps(paper, ensure_ascii=False, default=str) + "\n" for paper in papers).encode()
+    api.upload_file(
+        path_or_fileobj=data,
+        path_in_repo=filename,
+        repo_id=repo_id,
+        repo_type="dataset",
+    )
 
     url = f"https://huggingface.co/datasets/{repo_id}"
     logger.info("Uploaded %s papers to %s", len(papers), url)
