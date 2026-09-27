@@ -6,26 +6,26 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.14"
 dependencies = [
-    "atproto>=0.0.65",
-    "datasets>=4.8.5",
-    "deepl>=1.30.0",
-    "google-cloud-storage>=3.10.1",
-    "huggingface-hub>=1.16.1",
-    "joblib>=1.5.3",
-    "pandas>=3.0.3",
+    "atproto>=0.0.72",
+    "datasets>=5.0.1",
+    "deepl>=1.32.0",
+    "google-cloud-storage>=3.14.1",
+    "huggingface-hub>=1.32.0",
+    "joblib>=1.6.0",
+    "pandas>=3.0.6",
     "pdf2image>=1.17.0",
-    "python-dotenv>=1.2.2",
+    "python-dotenv>=1.2.3",
     "requests>=2.34.2",
-    "sentencex>=1.0.28",
-    "weasyprint>=68.1",
+    "sentencex>=1.0.31",
+    "weasyprint>=70.0",
 ]
 
 [dependency-groups]
 dev = [
-    "pre-commit>=4.6.0",
-    "pytest>=9.0.3",
-    "ruff>=0.15.14",
-    "ty>=0.0.39",
+    "pre-commit>=4.6.2",
+    "pytest>=9.1.1",
+    "ruff>=0.16.8",
+    "ty>=0.0.83",
 ]
 
 [tool.pytest.ini_options]
