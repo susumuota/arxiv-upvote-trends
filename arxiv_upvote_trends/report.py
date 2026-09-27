@@ -567,7 +567,7 @@ body {
 }
 
 .kicker {
-  display: inline-flex;
+  display: flex;
   gap: 8px;
   align-items: center;
   margin: 0 0 16px;
