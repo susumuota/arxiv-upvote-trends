@@ -5,6 +5,7 @@
 [![Python](https://img.shields.io/badge/python-3.14-blue)](https://www.python.org/)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![ty](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ty/main/assets/badge/v0.json)](https://github.com/astral-sh/ty)
 
 Collect trending papers from [Hugging Face Daily Papers](https://huggingface.co/papers), [alphaXiv](https://www.alphaxiv.org/), and [Hacker News](https://news.ycombinator.com/).
 
@@ -402,6 +403,9 @@ uv run pytest
 # Lint & Format
 uv run ruff check .
 uv run ruff format .
+
+# Type check
+uv run ty check
 ```
 
 ### pre-commit
